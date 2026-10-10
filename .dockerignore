@@ -1,0 +1,25 @@
+# dependencies & build output
+**/node_modules
+**/dist
+
+# version control / editor / os
+.git
+.gitignore
+.DS_Store
+
+# logs
+*.log
+npm-debug.log*
+
+# env & local data (never bake secrets or the sqlite db into an image)
+.env
+.env.*
+!.env.example
+data
+
+# tests
+**/coverage
+
+# docs not needed inside the image
+README.md
+prompt.md

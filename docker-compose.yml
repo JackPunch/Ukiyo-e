@@ -1,0 +1,43 @@
+# Local deployment: nginx-served frontend + Fastify API.
+#
+#   docker compose up --build     # then open http://localhost:8080
+#   docker compose down
+#
+# Build context is the repo root for both images (npm-workspaces monorepo).
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    # Only reachable by other services (nginx proxies /api here). Uncomment to
+    # also hit the API directly from the host, e.g. http://localhost:3000/api/health.
+    expose:
+      - "3000"
+    # ports:
+    #   - "3000:3000"
+    # Step 3 will add the SQLite file here; then mount it to persist across restarts:
+    # volumes:
+    #   - api-data:/app/data
+    healthcheck:
+      # Use 127.0.0.1 (not localhost): inside the container `localhost` resolves
+      # to IPv6 ::1 first, but Fastify binds IPv4 only -> connection refused.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+# volumes:
+#   api-data:

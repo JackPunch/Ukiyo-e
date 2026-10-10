@@ -1,0 +1,28 @@
+# dependencies
+node_modules
+
+# build output
+dist
+dist-ssr
+
+# logs
+*.log
+npm-debug.log*
+
+# env
+.env
+.env.*
+!.env.example
+
+# database / local data
+*.sqlite
+*.sqlite3
+*.db
+data/
+
+# editor / os
+.DS_Store
+.idea
+
+# tests
+coverage
