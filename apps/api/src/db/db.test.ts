@@ -24,7 +24,12 @@ describe("migrate", () => {
   it("applies pending migrations in filename order, once", () => {
     const db = createDatabase(":memory:");
     try {
-      expect(migrate(db)).toEqual(["0001_init.sql", "0002_users.sql"]);
+      expect(migrate(db)).toEqual([
+        "0001_init.sql",
+        "0002_users.sql",
+        "0003_tasks_images.sql",
+        "0004_point_transactions.sql",
+      ]);
       // Idempotent: a second run applies nothing new.
       expect(migrate(db)).toEqual([]);
     } finally {
@@ -41,6 +46,9 @@ describe("migrate", () => {
         .all()
         .map((row) => row.name as string);
       expect(tables).toContain("users");
+      expect(tables).toContain("tasks");
+      expect(tables).toContain("images");
+      expect(tables).toContain("point_transactions");
       expect(tables).not.toContain("projects");
     } finally {
       db.close();

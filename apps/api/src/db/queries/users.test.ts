@@ -2,7 +2,13 @@ import type { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createDatabase } from "../client";
 import { migrate } from "../migrate";
-import { createUser, findUserByEmail, findUserById, listUsers } from "./users";
+import {
+  createUser,
+  findUserByEmail,
+  findUserById,
+  listUsers,
+  registerUser,
+} from "./users";
 
 describe("users queries", () => {
   let db: DatabaseSync;
@@ -57,6 +63,38 @@ describe("users queries", () => {
       createUser(db, { email: "a@b.com", passwordHash: "hash" });
       expect(() =>
         createUser(db, { email: "A@B.com", passwordHash: "hash" }),
+      ).toThrow(/UNIQUE/);
+    });
+  });
+
+  describe("registerUser", () => {
+    it("creates a plain user with a zero balance", () => {
+      const user = registerUser(db, {
+        email: "new@b.com",
+        passwordHash: "hash",
+        displayName: "New",
+      });
+
+      expect(user).toMatchObject({
+        email: "new@b.com",
+        display_name: "New",
+        role: "user",
+        points_balance: 0,
+      });
+    });
+
+    it("normalizes the email like createUser", () => {
+      const user = registerUser(db, {
+        email: "  A@B.com ",
+        passwordHash: "hash",
+      });
+      expect(user.email).toBe("a@b.com");
+    });
+
+    it("rejects a duplicate email", () => {
+      registerUser(db, { email: "a@b.com", passwordHash: "hash" });
+      expect(() =>
+        registerUser(db, { email: "a@b.com", passwordHash: "hash" }),
       ).toThrow(/UNIQUE/);
     });
   });

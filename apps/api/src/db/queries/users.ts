@@ -28,6 +28,14 @@ export interface NewUser {
   pointsBalance?: number;
 }
 
+/** Input for {@link registerUser}; role and balance are intentionally absent. */
+export interface RegisterUserInput {
+  email: string;
+  /** Already-hashed password — never a plaintext password. */
+  passwordHash: string;
+  displayName?: string | null;
+}
+
 export interface ListUsersOptions {
   /** Page size. Defaults to 20. */
   limit?: number;
@@ -53,8 +61,10 @@ function normalizeEmail(email: string): string {
 }
 
 /**
- * Inserts a user and returns the created row.
- * Throws if the email is already taken (SQLite UNIQUE violation).
+ * Inserts a user and returns the created row. Lets the caller set `role` and
+ * starting balance, so this is the management / system entry point — public
+ * sign-up must go through {@link registerUser} instead. Throws if the email is
+ * already taken (SQLite UNIQUE violation).
  */
 export function createUser(db: DatabaseSync, input: NewUser): UserRow {
   const row = db
@@ -72,6 +82,24 @@ export function createUser(db: DatabaseSync, input: NewUser): UserRow {
     );
 
   return row as unknown as UserRow;
+}
+
+/**
+ * Self-service sign-up: always creates a `'user'` with a zero balance. Role and
+ * starting balance are fixed here, so a public registration endpoint cannot be
+ * tricked into minting an admin or seeding points.
+ */
+export function registerUser(
+  db: DatabaseSync,
+  input: RegisterUserInput,
+): UserRow {
+  return createUser(db, {
+    email: input.email,
+    passwordHash: input.passwordHash,
+    displayName: input.displayName,
+    role: "user",
+    pointsBalance: 0,
+  });
 }
 
 /** Looks a user up by email; matching is case- and whitespace-insensitive. */
