@@ -16,9 +16,11 @@ services:
       - "3000"
     # ports:
     #   - "3000:3000"
-    # Step 3 will add the SQLite file here; then mount it to persist across restarts:
-    # volumes:
-    #   - api-data:/app/data
+    environment:
+      # SQLite file lives on the mounted volume so it survives container restarts.
+      DATABASE_URL: /app/data/ukiyo-e.sqlite
+    volumes:
+      - api-data:/app/data
     healthcheck:
       # Use 127.0.0.1 (not localhost): inside the container `localhost` resolves
       # to IPv6 ::1 first, but Fastify binds IPv4 only -> connection refused.
@@ -39,5 +41,5 @@ services:
       api:
         condition: service_healthy
 
-# volumes:
-#   api-data:
+volumes:
+  api-data:

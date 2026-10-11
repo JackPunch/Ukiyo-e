@@ -59,3 +59,6 @@ docker compose logs -f        # 查看日志
 - `packages/shared` 直接导出 `./src/index.ts`，不打包，前后端共用同一份 zod schema。
 - 后端 `server.ts`（构建实例）与 `index.ts`（监听端口）分离，方便测试用 `app.inject()`。
 - 后端用 `tsx` 直接运行 TS 源码，无需编译产物。
+- 数据库用 Node 内置的 `node:sqlite`（零依赖、无原生编译）。连接与 PRAGMA 见 `apps/api/src/db/client.ts`；`buildServer` 启动时自动执行迁移并把连接挂到 `app.db`，关闭时释放。
+- 迁移是 `apps/api/src/db/migrations/*.sql` 里的原生 SQL，按文件名顺序执行并记录到 `_migrations` 表——新增迁移只要加一个 `0002_xxx.sql`。
+- `DATABASE_URL` 的相对路径按 `apps/api/` 解析（而非 cwd）；测试传入 `:memory:` 得到隔离的内存库。

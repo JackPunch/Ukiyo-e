@@ -42,6 +42,9 @@ COPY --chown=node:node tsconfig.base.json ./
 COPY --chown=node:node packages/shared ./packages/shared
 COPY --chown=node:node apps/api ./apps/api
 
+# SQLite writes here; owned by the unprivileged user the image runs as.
+RUN mkdir -p /app/data && chown node:node /app/data
+
 # Run as the unprivileged user that ships with the base image.
 USER node
 EXPOSE 3000
