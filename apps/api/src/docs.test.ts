@@ -4,6 +4,7 @@ import { apiErrorCodeSchema } from "@ukiyo-e/shared";
 import Fastify from "fastify";
 import { describe, expect, it } from "vitest";
 import { resolveAuthConfig } from "./auth/config";
+import { adminUsersRoutes } from "./routes/admin-users";
 import { authRoutes } from "./routes/auth";
 import { healthRoutes } from "./routes/health";
 
@@ -34,6 +35,7 @@ async function registeredRoutes(): Promise<string[]> {
 
   app.register(healthRoutes, { prefix: "/api" });
   app.register(authRoutes, { prefix: "/api" });
+  app.register(adminUsersRoutes, { prefix: "/api" });
   await app.ready();
   await app.close();
 

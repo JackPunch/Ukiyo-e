@@ -39,8 +39,18 @@ npm run dev:web      # 只启动前端
 npm run dev:api      # 只启动后端
 npm run build        # 构建
 npm run typecheck    # 类型检查
-npm run test         # 测试
+npm run test         # 单元/集成测试（Vitest + inject）
+npm run test:e2e     # 端到端测试（Playwright，需先 `npx playwright install chromium`）
+npm run test:e2e:docker  # 对 Docker 部署跑同一套 E2E（需先 docker compose up --build -d）
 npm run lint         # ESLint
+```
+
+E2E 用例在 `e2e/`。默认 [playwright.config.ts](./playwright.config.ts) 自动拉起后端（内存库 + 确定性的引导管理员）与 Vite 前端，无需手动起服务；[playwright.docker.config.ts](./playwright.docker.config.ts) 则**不启动任何服务**，直接打 Docker 部署（nginx :8080）。对 Docker 跑一遍：
+
+```bash
+docker compose up --build -d      # 确定性管理员：ADMIN_EMAIL=admin@example.com / ADMIN_PASSWORD=admin-password
+npm run test:e2e:docker
+docker compose down -v            # -v 一并删掉数据卷
 ```
 
 ## 认证与用户系统
@@ -59,6 +69,7 @@ npm run lint         # ESLint
 | --- | --- |
 | [docs/api.md](./docs/api.md) | **接口文档（单一事实来源）**：基础信息、参数、状态码、全部错误码 |
 | [docs/auth-design.md](./docs/auth-design.md) | 认证与用户系统设计 |
+| [docs/admin-design.md](./docs/admin-design.md) | 管理员系统设计（创建/查找用户） |
 | [docs/database-design.md](./docs/database-design.md) | 数据库表设计 |
 | [AGENTS.md](./AGENTS.md) | 面向 AI 编码代理的项目约定，含"接口变化必须同步接口文档"的硬性要求 |
 

@@ -7,6 +7,7 @@ import { resolveAuthConfig, type AuthConfigInput } from "./auth/config";
 import { createRequireAdmin, createRequireAuth } from "./auth/middleware";
 import { createDatabase } from "./db/client";
 import { migrate } from "./db/migrate";
+import { adminUsersRoutes } from "./routes/admin-users";
 import { authRoutes } from "./routes/auth";
 import { healthRoutes } from "./routes/health";
 
@@ -81,6 +82,7 @@ export async function buildServer(
 
   app.register(healthRoutes, { prefix: "/api" });
   app.register(authRoutes, { prefix: "/api" });
+  app.register(adminUsersRoutes, { prefix: "/api" });
 
   return app;
 }

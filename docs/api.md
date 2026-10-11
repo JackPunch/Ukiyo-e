@@ -59,7 +59,14 @@
 
 ### 2.4 分页与过滤
 
-本版本没有任何返回列表的端点。后续新增列表端点时，在本节补充统一的分页约定（候选：`?limit=&offset=` + `{ items, total }`）并同步 §4。
+所有返回列表的端点统一使用：
+
+- **查询参数**：`?limit=&offset=`（默认 `limit=20`、`offset=0`，`limit` 上限 `100`）。端点可另加过滤参数（如 `q`）。
+- **响应信封**：`{ items: T[], total, limit, offset }`。
+  - `total` 是**应用过滤后**的总条数，用于计算页数；
+  - `limit` / `offset` 回显**生效值**（含默认值与上限钳制），客户端据此渲染分页控件。
+
+首个采用该约定的端点是 [§4.7 `GET /api/admin/users`](#47-get-apiadminusers)；参数越界返回 `400 validation_error`。
 
 ### 2.5 路径与方法
 
@@ -218,6 +225,94 @@ set-cookie: ukiyo_session=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00
 | `200` | — | 返回当前用户 |
 | `401` | `unauthorized` | 无 Cookie、令牌无效/过期、用户已被删除 |
 
+### 4.6 `POST /api/admin/users`
+
+管理员创建一个新用户。鉴权：**需要**，且需管理员。
+
+| 请求体 | 类型 | 必填 | 约束 |
+| --- | --- | --- | --- |
+| `email` | string | 是 | 合法邮箱；入库前统一 `trim` + 小写 |
+| `password` | string | 是 | 长度 8–128 |
+| `displayName` | string | 否 | `trim` 后 1–50 字符；不传等价 `null` |
+
+- 创建出的用户**角色固定为 `user`、积分余额固定为 `0`**——管理员角色只能由环境变量引导产生（见 §5.2）。
+- 成功**不下发会话 Cookie**：不影响发起请求的管理员登录态；新用户需自行登录。
+
+`201 Created`
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `user` | `PublicUser` | 新建用户，字段见 §5.1 |
+
+| 状态码 | `code` | 场景 |
+| --- | --- | --- |
+| `201` | — | 创建成功 |
+| `400` | `validation_error` | 邮箱/密码/展示名不合法（`details` 指明字段） |
+| `401` | `unauthorized` | 未登录 |
+| `403` | `forbidden` | 已登录但非管理员 |
+| `409` | `email_taken` | 邮箱已存在（含大小写变体） |
+
+```jsonc
+// 201
+{
+  "user": {
+    "id": 2,
+    "email": "new@b.com",
+    "displayName": null,
+    "role": "user",
+    "pointsBalance": 0,
+    "lastLoginAt": null,
+    "createdAt": "2026-10-11T12:00:00.000Z"
+  }
+}
+```
+
+### 4.7 `GET /api/admin/users`
+
+管理员分页检索用户。鉴权：**需要**，且需管理员。分页约定见 §2.4。
+
+| 参数 | 位置 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- | --- |
+| `limit` | query | int `1–100` | 否 | `20` | 每页条数 |
+| `offset` | query | int `≥0` | 否 | `0` | 跳过的条数 |
+| `q` | query | string `≤100` | 否 | — | 关键词；`email` 或 `displayName` 的子串匹配（ASCII 大小写不敏感）；`trim` 后空串等价未提供 |
+
+`200 OK`
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `items` | `PublicUser[]` | 当前页用户，字段见 §5.1 |
+| `total` | number | 过滤后的总条数 |
+| `limit` | number | 生效的每页条数 |
+| `offset` | number | 生效的偏移量 |
+
+| 状态码 | `code` | 场景 |
+| --- | --- | --- |
+| `200` | — | 返回列表 |
+| `400` | `validation_error` | `limit` / `offset` / `q` 不合法 |
+| `401` | `unauthorized` | 未登录 |
+| `403` | `forbidden` | 已登录但非管理员 |
+
+```jsonc
+// 200
+{
+  "items": [
+    {
+      "id": 1,
+      "email": "admin@b.com",
+      "displayName": null,
+      "role": "admin",
+      "pointsBalance": 0,
+      "lastLoginAt": null,
+      "createdAt": "2026-10-11T11:00:00.000Z"
+    }
+  ],
+  "total": 1,
+  "limit": 20,
+  "offset": 0
+}
+```
+
 ## 5. 数据模型
 
 ### 5.1 `PublicUser`
@@ -238,7 +333,7 @@ set-cookie: ukiyo_session=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00
 
 | 名称 | 取值 | 说明 |
 | --- | --- | --- |
-| `role` | `user` / `admin` | `admin` 即管理员；由环境变量引导或后续管理端点产生 |
+| `role` | `user` / `admin` | `admin` 即管理员；v1 仅由环境变量引导产生（[§9 auth-design](./auth-design.md)），管理端点创建的用户固定为 `user` |
 | `error.code` | 见 §3 | 定义于 `packages/shared/src/schemas/errors.ts` |
 
 ## 6. 新增受保护端点的实现约定

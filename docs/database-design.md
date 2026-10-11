@@ -239,7 +239,8 @@ CREATE INDEX idx_point_tx_user_created
 采用 `users.role`（已确认）。
 
 - 授权：在 Fastify 侧增加 `requireAdmin` 前置钩子，读取当前登录用户的 `role`，非 `admin` 返回 403。属于接口层，不进表结构。
-- 管理员「管理用户」= 对 `users` 表的读 + 改 `role`/`points_balance`，以及删除用户。
+- **已落地（路线图第 4 步）**：`requireAdmin` 与两个管理端点（`POST /api/admin/users` 创建、`GET /api/admin/users` 分页检索）。**不新增表**——管理员就是 `role='admin'` 的用户，创建用户固定 `role='user'`（详见 [admin-design.md](./admin-design.md)）。
+- 管理员「管理用户」的其余部分（改 `role`/`points_balance`、删除用户、启用/禁用）**尚未实现**，按路线图留待后续步骤（积分见第 8 步）。
 - 建议（可选，后续加）：`admin_audit_log` 表，记录「谁在何时改了谁的什么」，例如：
 
 ```sql
@@ -288,4 +289,4 @@ CREATE TABLE admin_audit_log (
 4. ✅ 已落地（§6）：迁移 `apps/api/src/db/migrations/0004_point_transactions.sql` 建 `point_transactions` 表与索引；查询模块 `apps/api/src/db/queries/point-transactions.ts` 提供 `recordPointTransaction`（原子记账）/ `findPointTransactionById` / `listPointTransactions`，含 Vitest 测试。
 5. 图片落盘与 `STORAGE_ROOT`（第 7 步）在实现存储逻辑时引入。
 6. 第 8 步接入业务时，用 `recordPointTransaction` 记录 `signup_bonus` / `task_spend` / `task_refund`，并复用其原子事务。
-7. 管理员上线时再加 `requireAdmin` 钩子（§7.1）。
+7. 管理员上线时再加 `requireAdmin` 钩子（§7.1）。<br>✅ 已落地（第 4 步）：`requireAdmin` + `apps/api/src/routes/admin-users.ts` 的创建/检索端点；`listUsers` 增加 `search` 过滤。设计见 [admin-design.md](./admin-design.md)。

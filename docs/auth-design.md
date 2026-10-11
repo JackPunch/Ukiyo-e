@@ -163,7 +163,7 @@ JWT 是**跨实现的公开格式**，自实现校验需要同时正确处理：
 ### 5.2 `requireAdmin`
 
 - 依赖 `requireAuth` 先执行；`request.user.role !== "admin"` → `403 { error: { code: "forbidden" } }`。
-- 这是路线图第 4 步管理员系统的**唯一授权入口**，本次先落地机制，管理端点留给第 4 步。
+- 这是管理员系统的**唯一授权入口**；第 4 步的管理端点（`/api/admin/users`）已挂在其后落地，见 [admin-design.md](./admin-design.md) 与 [api.md §4](./api.md)。
 
 ### 5.3 鉴权以数据库为准
 

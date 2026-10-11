@@ -44,6 +44,15 @@
   cursor: default;
 }
 
+.adminLink {
+  padding: 10px 16px;
+  border: 1px solid var(--accent-border);
+  border-radius: 8px;
+  background: var(--accent-bg);
+  color: var(--text-h);
+  text-decoration: none;
+}
+
 .error {
   color: #d64545;
   font-size: 14px;

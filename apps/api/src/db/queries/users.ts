@@ -41,12 +41,26 @@ export interface ListUsersOptions {
   limit?: number;
   /** Rows to skip. Defaults to 0. */
   offset?: number;
+  /**
+   * Case-insensitive (ASCII) substring filter on email or display name. An
+   * empty/whitespace value is ignored, so it never filters everything out.
+   */
+  search?: string;
 }
 
 export interface ListUsersResult {
   items: UserRow[];
-  /** Total users ignoring pagination, for building paging controls. */
+  /** Total users matching the filter and ignoring pagination, for paging controls. */
   total: number;
+}
+
+/**
+ * Escapes LIKE metacharacters so a user-supplied term matches literally: without
+ * this, searching `%` would match every row and `_` would match any character.
+ * The matching `ESCAPE '\'` clause lives in {@link listUsers}.
+ */
+function escapeLikePattern(term: string): string {
+  return term.replace(/[\\%_]/g, (char) => `\\${char}`);
 }
 
 const COLUMNS = `id, email, display_name, password_hash, role, points_balance,
@@ -124,20 +138,30 @@ export function findUserById(
   return row as unknown as UserRow | undefined;
 }
 
-/** Returns one page of users ordered by id, plus the total user count. */
+/** Returns one page of users ordered by id, plus the total match count. */
 export function listUsers(
   db: DatabaseSync,
   options: ListUsersOptions = {},
 ): ListUsersResult {
   const { limit = 20, offset = 0 } = options;
+  const search = options.search?.trim();
+
+  const where = search
+    ? "WHERE (email LIKE ? ESCAPE '\\' OR display_name LIKE ? ESCAPE '\\')"
+    : "";
+  const filterParams = search
+    ? [`%${escapeLikePattern(search)}%`, `%${escapeLikePattern(search)}%`]
+    : [];
 
   const items = db
-    .prepare(`SELECT ${COLUMNS} FROM users ORDER BY id LIMIT ? OFFSET ?`)
-    .all(limit, offset) as unknown as UserRow[];
+    .prepare(
+      `SELECT ${COLUMNS} FROM users ${where} ORDER BY id LIMIT ? OFFSET ?`,
+    )
+    .all(...filterParams, limit, offset) as unknown as UserRow[];
 
   const { count } = db
-    .prepare("SELECT COUNT(*) AS count FROM users")
-    .get() as unknown as { count: number };
+    .prepare(`SELECT COUNT(*) AS count FROM users ${where}`)
+    .get(...filterParams) as unknown as { count: number };
 
   return { items, total: count };
 }

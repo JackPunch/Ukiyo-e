@@ -1,6 +1,5 @@
 import { errorBody, loginRequestSchema, registerRequestSchema } from "@ukiyo-e/shared";
 import type { FastifyInstance, FastifyReply } from "fastify";
-import type { ZodError } from "zod";
 import { clearSessionCookie, setSessionCookie } from "../auth/cookie";
 import { dummyPasswordHash, hashPassword, verifyPassword } from "../auth/password";
 import { toPublicUser } from "../auth/public-user";
@@ -11,28 +10,7 @@ import {
   updateUserLastLogin,
   type UserRow,
 } from "../db/queries/users";
-
-/**
- * The pre-check already covers the common case; this closes the race where two
- * requests register the same email at once, so a UNIQUE violation becomes a 409
- * instead of a 500.
- */
-function isUniqueViolation(error: unknown): boolean {
-  return error instanceof Error && error.message.includes("UNIQUE constraint failed");
-}
-
-function sendValidationError(reply: FastifyReply, error: ZodError) {
-  return reply.status(400).send(
-    errorBody(
-      "validation_error",
-      "请求参数不合法",
-      error.issues.map((issue) => ({
-        path: issue.path.map(String).join("."),
-        message: issue.message,
-      })),
-    ),
-  );
-}
+import { isUniqueViolation, sendValidationError } from "./helpers";
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
   const { authConfig } = app;

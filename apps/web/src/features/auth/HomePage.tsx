@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { errorMessage } from "../../api/client";
 import { useHealthCheck } from "../health/useHealthCheck";
 import styles from "./home.module.css";
@@ -35,6 +36,12 @@ export function HomePage() {
       </dl>
 
       <div className={styles.actions}>
+        {user.role === "admin" && (
+          <Link className={styles.adminLink} to="/admin/users">
+            用户管理
+          </Link>
+        )}
+
         <button type="button" onClick={() => logout.mutate()} disabled={logout.isPending}>
           {logout.isPending ? "登出中…" : "登出"}
         </button>

@@ -164,5 +164,73 @@ describe("users queries", () => {
       expect(listUsers(db).items).toHaveLength(20);
       expect(listUsers(db).total).toBe(25);
     });
+
+    it("filters by email or display name substring", () => {
+      createUser(db, { email: "alice@b.com", passwordHash: "hash" });
+      createUser(db, {
+        email: "bob@b.com",
+        passwordHash: "hash",
+        displayName: "Alice",
+      });
+      createUser(db, { email: "carol@b.com", passwordHash: "hash" });
+
+      const result = listUsers(db, { search: "alice" });
+
+      expect(result.items.map((user) => user.email)).toEqual([
+        "alice@b.com",
+        "bob@b.com",
+      ]);
+      expect(result.total).toBe(2);
+    });
+
+    it("matches the search case-insensitively", () => {
+      createUser(db, { email: "alice@b.com", passwordHash: "hash" });
+
+      expect(listUsers(db, { search: "ALICE" }).total).toBe(1);
+    });
+
+    it("treats LIKE wildcards in the search as literal characters", () => {
+      createUser(db, { email: "a_b@b.com", passwordHash: "hash" });
+      createUser(db, { email: "axb@b.com", passwordHash: "hash" });
+      createUser(db, { email: "50%off@b.com", passwordHash: "hash" });
+      createUser(db, { email: "plain@b.com", passwordHash: "hash" });
+
+      // `_` must not act as "any single character".
+      expect(
+        listUsers(db, { search: "a_b" }).items.map((user) => user.email),
+      ).toEqual(["a_b@b.com"]);
+      // `%` must not act as "any sequence".
+      expect(
+        listUsers(db, { search: "%off" }).items.map((user) => user.email),
+      ).toEqual(["50%off@b.com"]);
+      // A lone wildcard matches literally, not everything.
+      expect(listUsers(db, { search: "%" }).total).toBe(1);
+    });
+
+    it("ignores a whitespace-only search", () => {
+      createUser(db, { email: "a@b.com", passwordHash: "hash" });
+      createUser(db, { email: "b@b.com", passwordHash: "hash" });
+
+      expect(listUsers(db, { search: "   " }).total).toBe(2);
+    });
+
+    it("combines the search filter with pagination", () => {
+      for (const email of [
+        "team1@b.com",
+        "team2@b.com",
+        "team3@b.com",
+        "other@b.com",
+      ]) {
+        createUser(db, { email, passwordHash: "hash" });
+      }
+
+      const page = listUsers(db, { search: "team", limit: 2, offset: 1 });
+
+      expect(page.items.map((user) => user.email)).toEqual([
+        "team2@b.com",
+        "team3@b.com",
+      ]);
+      expect(page.total).toBe(3);
+    });
   });
 });

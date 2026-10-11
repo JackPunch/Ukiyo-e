@@ -36,6 +36,7 @@ npm install
 npm run dev        # web :5173 + api :3000（Vite 代理 /api）
 npm run typecheck
 npm run test
+npm run test:e2e   # Playwright E2E（自动拉起 api + web）
 npm run lint
 npm run build
 ```
@@ -43,7 +44,9 @@ npm run build
 - 后端测试用 Vitest + `app.inject()`，通过 `buildServer({ databaseUrl: ":memory:" })` 拿到隔离数据库；测试助手在 `apps/api/src/test-support.ts`。
 - 测试**不加载 `.env`**，认证配置必须显式传入（`buildTestServer()` 已处理）。
 - `buildServer()` 是 async：启动时先校验配置，再迁移数据库、执行管理员引导。
-- Playwright 尚未接入（测试栈里预留，见 [note.md](./note.md) 第 1 步）。
+- E2E 在 `e2e/`（Playwright）：`npm run test:e2e`；由 `playwright.config.ts` 自动拉起后端（内存库 + 确定性的 `ADMIN_EMAIL`/`ADMIN_PASSWORD`）与 Vite 前端，本地首次需 `npx playwright install chromium`。Vite 监听 IPv6 `[::1]`，故配置里前端 URL 用 `localhost`。
+- 对 **Docker 部署**跑同一套 E2E：先 `docker compose up --build -d`，再 `npm run test:e2e:docker`（`playwright.docker.config.ts` 不启动服务，直接打 `http://localhost:8080`；可用 `E2E_BASE_URL` 覆盖）。
+- 根 `tsconfig.json` 覆盖两个 Playwright 配置与 `e2e/`（`types: ["node"]`），因此编辑器与 `npm run typecheck` 都会对这些根级 TS 文件做类型检查——它们不在任何 workspace 的 tsconfig 里，缺了这个根配置会报 `Cannot find name 'process'`。
 
 ## 前端约定
 
