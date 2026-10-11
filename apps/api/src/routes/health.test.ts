@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildServer } from "../server";
+import { buildTestServer } from "../test-support";
 
 describe("GET /api/health", () => {
   it("returns a healthy response", async () => {
-    const app = buildServer({ databaseUrl: ":memory:" });
+    const app = await buildTestServer();
 
     const response = await app.inject({ method: "GET", url: "/api/health" });
 

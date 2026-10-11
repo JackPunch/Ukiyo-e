@@ -141,3 +141,41 @@ export function listUsers(
 
   return { items, total: count };
 }
+
+/**
+ * Stamps a successful login and returns the updated row (or `undefined` if the
+ * user is gone). Defaults to now so callers cannot forget the timestamp.
+ */
+export function updateUserLastLogin(
+  db: DatabaseSync,
+  id: number,
+  at: string = new Date().toISOString(),
+): UserRow | undefined {
+  const row = db
+    .prepare(
+      `UPDATE users SET last_login_at = ?, updated_at = ? WHERE id = ?
+       RETURNING ${COLUMNS}`,
+    )
+    .get(at, at, id);
+
+  return row as unknown as UserRow | undefined;
+}
+
+/**
+ * Changes a user's role and returns the updated row. Used by the admin
+ * bootstrap, and by the admin system's user management in step 4.
+ */
+export function updateUserRole(
+  db: DatabaseSync,
+  id: number,
+  role: UserRole,
+): UserRow | undefined {
+  const row = db
+    .prepare(
+      `UPDATE users SET role = ?, updated_at = ? WHERE id = ?
+       RETURNING ${COLUMNS}`,
+    )
+    .get(role, new Date().toISOString(), id);
+
+  return row as unknown as UserRow | undefined;
+}

@@ -19,6 +19,18 @@ services:
     environment:
       # SQLite file lives on the mounted volume so it survives container restarts.
       DATABASE_URL: /app/data/ukiyo-e.sqlite
+      # Session JWT signing key (HS256), at least 32 characters. Override it in
+      # a local .env for anything beyond a throwaway demo.
+      JWT_SECRET: ${JWT_SECRET:-dev-only-secret-please-replace-0123456789abcdef}
+      JWT_TTL: ${JWT_TTL:-7d}
+      # Bootstrap admin: created on first start, promoted (never password-reset)
+      # afterwards.
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin-password}
+      # This deployment is plain HTTP (http://localhost:8080), so the session
+      # cookie must not carry Secure — browsers would drop it. Set to true when
+      # putting this behind HTTPS.
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
     volumes:
       - api-data:/app/data
     healthcheck:

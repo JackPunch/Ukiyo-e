@@ -269,9 +269,9 @@ CREATE TABLE admin_audit_log (
 | D2 | 积分模型 | 余额缓存 + `point_transactions` 流水 | ✅ 已定 |
 | D3 | 主键类型 | `INTEGER AUTOINCREMENT` | ✅ 已定 |
 | D4 | 用户删除方式 | v1 物理删除；仍有任务时禁止删除（`tasks.user_id` 默认 `NO ACTION`） | ✅ 已定 |
-| D5 | 密码哈希算法 | `crypto.scrypt`（零依赖）等实现时定 | ⬜ 待定 |
-| D6 | 是否记录登录 `last_login_at` | 保留字段，登录成功时更新 | ⬜ 待定 |
-| D7 | `updated_at` 维护方式 | 查询层显式写入（非触发器） | ⬜ 待定 |
+| D5 | 密码哈希算法 | `crypto.scrypt`（零依赖，自描述格式） | ✅ 已定（见 docs/auth-design.md §3） |
+| D6 | 是否记录登录 `last_login_at` | 保留字段，登录成功时由 `updateUserLastLogin` 更新 | ✅ 已定 |
+| D7 | `updated_at` 维护方式 | 查询层显式写入（非触发器）；写 `UPDATE` 的查询函数同时更新 `updated_at` | ✅ 已定 |
 | D8 | 任务↔图片基数 | 一对多；外键在 `images.task_id`，`tasks` 不存图片 ID（`position` 排序） | ✅ 已定 |
 | D9 | 删除级联 | 删任务级联删图片元数据 + 磁盘文件；删用户有任务则拒绝 | ✅ 已定 |
 | D10 | 任务参数存储 | `prompt` 独立列 + `params` 存 JSON 文本 | ✅ 已定 |
