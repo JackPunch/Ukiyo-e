@@ -27,6 +27,8 @@ services:
       # afterwards.
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin-password}
+      # Required by POST /api/tasks; never bake this secret into the image.
+      KIE_API_KEY: ${KIE_API_KEY:?KIE_API_KEY must be set in .env}
       # This deployment is plain HTTP (http://localhost:8080), so the session
       # cookie must not carry Secure — browsers would drop it. Set to true when
       # putting this behind HTTPS.

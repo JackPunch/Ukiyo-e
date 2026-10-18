@@ -102,7 +102,7 @@
 | `forbidden` | `403` | 已登录但权限不足 | 非 `admin` 访问管理端点 | 提示无权限；不要重试 |
 | `not_found` | `404` | 接口不存在 | 路径未匹配任何路由；或路径存在但方法不匹配 | 检查路径/方法（通常是代码问题，不是运行时错误） |
 | `email_taken` | `409` | 邮箱已被注册 | 注册邮箱重复，含 `A@B.com` / `a@b.com` 这类大小写变体 | 提示已注册并引导去登录 |
-| `internal_error` | `500` | 服务器内部错误 | 未预期异常、数据库故障等（**真实原因只记服务端日志，不返回**） | 提示稍后重试；不要展示原始信息 |
+| `internal_error` | `500` / `502` | 服务器内部错误或上游 AI 服务不可用 | 未预期异常、数据库故障、AI Key 未配置、AI 服务超时/拒绝请求等（**真实原因只记服务端日志，不返回**） | 提示稍后重试；不要展示原始信息 |
 
 补充说明：
 
@@ -328,6 +328,116 @@ set-cookie: ukiyo_session=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00
 | `pointsBalance` | number | 否 | 积分余额（缓存值，权威账本为积分流水表），注册时为 `0` |
 | `lastLoginAt` | string \| null | 是 | 最近登录时间；注册后未登录过为 `null` |
 | `createdAt` | string | 否 | 注册时间 |
+
+### 4.8 Mock provider task API
+
+用于测试 Kie.ai Market 任务客户端，不访问外部服务、不消耗积分。鉴权：**不需要**。
+接口返回格式仿照 [bananaAPI.md](./bananaAPI.md) 与
+[resultAPI.md](./resultAPI.md)，但属于本地 mock，不应在生产环境暴露。
+
+#### `POST /api/mock/jobs/createTask`
+
+创建一个 mock 任务。
+
+请求体：
+
+| 字段 | 类型 | 必填 | 约束 |
+| --- | --- | --- | --- |
+| `model` | `"nano-banana-2-1"` | 是 | 固定值 |
+| `callBackUrl` | string | 否 | 合法 URL；mock 不会发送回调 |
+| `input.prompt` | string | 是 | 1–20,000 字符 |
+| `input.image_input` | string[] | 否 | 合法 URL，最多 10 个 |
+| `input.aspect_ratio` | string | 否 | 原样保留 |
+| `input.resolution` | `"1K"` \| `"2K"` \| `"4K"` | 否 | |
+| `input.output_format` | `"png"` \| `"jpg"` | 否 | |
+
+`200 OK`
+
+```json
+{
+  "code": 200,
+  "msg": "success",
+  "data": {
+    "taskId": "mock_..."
+  }
+}
+```
+
+#### `GET /api/mock/jobs/recordInfo`
+
+查询 mock 任务。必填查询参数 `taskId`。
+
+- 第一次查询返回 `state: "generating"`；
+- 第二次及之后查询返回 `state: "success"`；
+- 成功时 `resultJson` 和 `response.resultUrls` 各包含一个 mock URL；
+- 未知任务返回 HTTP `200`、业务 `code: 422`，以模拟供应商接口行为。
+
+成功响应示例：
+
+```json
+{
+  "code": 200,
+  "msg": "success",
+  "data": {
+    "taskId": "mock_...",
+    "model": "nano-banana-2-1",
+    "state": "success",
+    "resultJson": "{\"resultUrls\":[\"https://mock.invalid/generated/mock_....jpg\"]}",
+    "response": {
+      "resultUrls": ["https://mock.invalid/generated/mock_....jpg"]
+    },
+    "failCode": null,
+    "failMsg": null,
+    "costTime": 1,
+    "completeTime": 1760000001000,
+    "createTime": 1760000000000,
+    "creditsConsumed": 4
+  }
+}
+```
+
+请求参数校验失败仍遵循本 API 的统一错误信封，返回 `400 validation_error`。
+
+### 4.9 `POST /api/tasks`
+
+创建一个 Nano Banana 2.1 图片生成任务。鉴权：**需要登录**。
+服务端会同步调用 Kie.ai 的创建任务接口；此步骤只负责提交任务，不查询进度或下载图片。
+
+请求体字段与 [Mock provider task API](#48-mock-provider-task-api) 相同：
+
+```json
+{
+  "model": "nano-banana-2-1",
+  "input": {
+    "prompt": "A simple ukiyo-e style blue wave",
+    "aspect_ratio": "1:1",
+    "resolution": "1K",
+    "output_format": "jpg"
+  }
+}
+```
+
+`200 OK`
+
+```json
+{
+  "taskId": 1,
+  "providerTaskId": "dc1928bfcbc77cb6c85f3359a9c718b3",
+  "status": "queued"
+}
+```
+
+服务端通过 `KIE_API_KEY` 环境变量读取供应商密钥，不会把密钥写入数据库或响应。
+供应商请求超时为 30 秒。供应商不可用、返回非 JSON、拒绝任务或未配置密钥时返回
+`502 internal_error`（未配置密钥为 `500 internal_error`），详细原因只写服务端日志。
+
+| 状态码 | `code` | 场景 |
+| --- | --- | --- |
+| `200` | — | 供应商已接受任务 |
+| `400` | `validation_error` | 请求参数不合法 |
+| `401` | `unauthorized` | 未登录 |
+| `500` | `internal_error` | 服务端未配置 `KIE_API_KEY` |
+| `502` | `internal_error` | 供应商超时、不可用、响应无效或拒绝任务 |
 
 ### 5.2 枚举
 

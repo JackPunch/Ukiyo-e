@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=../../.env src/index.ts",
     "start": "tsx --env-file-if-exists=../../.env src/index.ts",
+    "test:banana": "tsx --env-file-if-exists=../../.env scripts/test-banana-api.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

@@ -11,6 +11,7 @@
     "dev": "concurrently -n web,api -c cyan,magenta \"npm:dev:web\" \"npm:dev:api\"",
     "dev:web": "npm run dev -w @ukiyo-e/web",
     "dev:api": "npm run dev -w @ukiyo-e/api",
+    "test:banana": "npm run test:banana -w @ukiyo-e/api",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "tsc -p tsconfig.json --noEmit && npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",

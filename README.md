@@ -40,6 +40,7 @@ npm run dev:api      # 只启动后端
 npm run build        # 构建
 npm run typecheck    # 类型检查
 npm run test         # 单元/集成测试（Vitest + inject）
+npm run test:banana  # 使用 .env 中的 KIE_API_KEY 测试 Nano Banana API
 npm run test:e2e     # 端到端测试（Playwright，需先 `npx playwright install chromium`）
 npm run test:e2e:docker  # 对 Docker 部署跑同一套 E2E（需先 docker compose up --build -d）
 npm run lint         # ESLint
@@ -52,6 +53,9 @@ docker compose up --build -d      # 确定性管理员：ADMIN_EMAIL=admin@examp
 npm run test:e2e:docker
 docker compose down -v            # -v 一并删掉数据卷
 ```
+
+Docker Compose 会从根目录 `.env` 读取 `KIE_API_KEY`，用于登录后的图片任务创建；
+未配置时 Compose 会在启动前明确报错。
 
 ## 认证与用户系统
 

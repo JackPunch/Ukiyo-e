@@ -29,6 +29,53 @@
   gap: 12px;
 }
 
+.taskForm {
+  display: grid;
+  gap: 12px;
+  width: min(560px, 100%);
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  text-align: left;
+}
+
+.taskForm h2 {
+  text-align: center;
+}
+
+.taskForm label {
+  display: grid;
+  gap: 4px;
+  color: var(--text-h);
+}
+
+.taskForm textarea,
+.taskForm select,
+.taskForm button {
+  box-sizing: border-box;
+  padding: 10px;
+  border: 1px solid var(--accent-border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text-h);
+  font: inherit;
+}
+
+.taskForm textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.taskForm button {
+  background: var(--accent-bg);
+  cursor: pointer;
+}
+
+.taskForm button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
 .actions button {
   padding: 10px 16px;
   border: 1px solid var(--accent-border);
@@ -55,6 +102,11 @@
 
 .error {
   color: #d64545;
+  font-size: 14px;
+}
+
+.success {
+  color: #2d8a4e;
   font-size: 14px;
 }
 
