@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { errorMessage } from "../../api/client";
 import styles from "./admin.module.css";
 import { useCreateUser } from "./useCreateUser";
+import { useAdjustPoints } from "./useAdjustPoints";
 import { useUsers } from "./useUsers";
 
 const PAGE_SIZE = 20;
@@ -19,6 +20,7 @@ export function AdminUsersPage() {
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const createUser = useCreateUser();
+  const adjustPoints = useAdjustPoints();
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -43,6 +45,18 @@ export function AdminUsersPage() {
         },
       },
     );
+  }
+
+  function handleAdjustPoints(userId: number, email: string) {
+    const rawAmount = window.prompt(`请输入 ${email} 的积分变动（可为负数）`);
+    if (rawAmount === null) return;
+    const amount = Number(rawAmount);
+    if (!Number.isInteger(amount) || amount === 0) {
+      window.alert("积分变动必须是非零整数");
+      return;
+    }
+    const note = window.prompt("请输入备注（可选）") ?? undefined;
+    adjustPoints.mutate({ userId, amount, note });
   }
 
   const data = users.data;
@@ -132,6 +146,9 @@ export function AdminUsersPage() {
         {users.isError && (
           <p className={styles.error}>{errorMessage(users.error)}</p>
         )}
+        {adjustPoints.isError && (
+          <p className={styles.error}>{errorMessage(adjustPoints.error)}</p>
+        )}
 
         {data && (
           <>
@@ -143,6 +160,7 @@ export function AdminUsersPage() {
                   <th>展示名</th>
                   <th>角色</th>
                   <th>积分</th>
+                  <th>操作</th>
                   <th>最近登录</th>
                   <th>创建时间</th>
                 </tr>
@@ -156,6 +174,18 @@ export function AdminUsersPage() {
                     <td>{user.role === "admin" ? "管理员" : "普通用户"}</td>
                     <td>{user.pointsBalance}</td>
                     <td>
+                      <button
+                        type="button"
+                        className={styles.action}
+                        disabled={adjustPoints.isPending}
+                        onClick={() =>
+                          handleAdjustPoints(user.id, user.email)
+                        }
+                      >
+                        调整积分
+                      </button>
+                    </td>
+                    <td>
                       {user.lastLoginAt
                         ? new Date(user.lastLoginAt).toLocaleString()
                         : "—"}
@@ -165,7 +195,7 @@ export function AdminUsersPage() {
                 ))}
                 {data.items.length === 0 && (
                   <tr>
-                    <td className={styles.empty} colSpan={7}>
+                    <td className={styles.empty} colSpan={8}>
                       没有匹配的用户
                     </td>
                   </tr>

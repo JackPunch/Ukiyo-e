@@ -5,6 +5,7 @@ import { migrate } from "../migrate";
 import { createUser } from "./users";
 import {
   findPointTransactionById,
+  InsufficientPointsError,
   listPointTransactions,
   recordPointTransaction,
 } from "./point-transactions";
@@ -108,7 +109,7 @@ describe("point transaction queries", () => {
           amount: -11,
           reason: "task_spend",
         }),
-      ).toThrow(/CHECK/);
+      ).toThrow(InsufficientPointsError);
 
       expect(balanceOf(userId)).toBe(10);
       expect(listPointTransactions(db, { userId }).total).toBe(1);

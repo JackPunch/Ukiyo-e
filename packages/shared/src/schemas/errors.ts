@@ -14,6 +14,7 @@ export const apiErrorCodeSchema = z.enum([
   "forbidden",
   "not_found",
   "email_taken",
+  "insufficient_points",
   "internal_error",
 ]);
 

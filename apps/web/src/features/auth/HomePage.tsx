@@ -5,6 +5,7 @@ import { useHealthCheck } from "../health/useHealthCheck";
 import styles from "./home.module.css";
 import { useLogout } from "./useLogout";
 import { useSession } from "./useSession";
+import { usePointTransactions } from "./usePointTransactions";
 import {
   useCreateTask,
   useTaskHistory,
@@ -24,6 +25,7 @@ export function HomePage() {
   const health = useHealthCheck();
   const createTask = useCreateTask();
   const taskHistory = useTaskHistory();
+  const pointTransactions = usePointTransactions();
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [prompt, setPrompt] = useState("");
   const [aspectRatio, setAspectRatio] = useState("1:1");
@@ -127,7 +129,7 @@ export function HomePage() {
                 </select>
               </label>
               <button type="submit" disabled={createTask.isPending}>
-                {createTask.isPending ? "提交中…" : "创建任务"}
+                {createTask.isPending ? "提交中…" : "创建任务（消耗 1 积分）"}
               </button>
             </form>
             {createTask.isError && (
@@ -191,6 +193,38 @@ export function HomePage() {
           <dt>积分余额</dt>
           <dd>{user.pointsBalance}</dd>
         </dl>
+        <section className={styles.points}>
+          <h2>积分变化记录</h2>
+          {pointTransactions.isLoading && <p>加载中…</p>}
+          {pointTransactions.isError && (
+            <p className={styles.error}>
+              加载失败：{errorMessage(pointTransactions.error)}
+            </p>
+          )}
+          {pointTransactions.data?.items.length === 0 && <p>暂无积分记录</p>}
+          {pointTransactions.data && pointTransactions.data.items.length > 0 && (
+            <ul className={styles.pointsList}>
+              {pointTransactions.data.items.map((transaction) => (
+                <li key={transaction.id}>
+                  <span>
+                    {transaction.reason === "task_spend"
+                      ? "创建任务"
+                      : transaction.reason === "task_refund"
+                        ? "任务失败退款"
+                        : transaction.reason === "admin_adjust"
+                          ? "管理员调整"
+                          : "系统奖励"}
+                    {transaction.note ? `：${transaction.note}` : ""}
+                  </span>
+                  <strong className={transaction.amount > 0 ? styles.credit : styles.debit}>
+                    {transaction.amount > 0 ? "+" : ""}
+                    {transaction.amount}
+                  </strong>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
         <div className={styles.actions}>
           {user.role === "admin" && (
             <Link className={styles.adminLink} to="/admin/users">用户管理</Link>

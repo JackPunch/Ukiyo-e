@@ -53,6 +53,34 @@ export const adminUserListResponseSchema = z.object({
   offset: z.number().int().min(0),
 });
 
+export const adminAdjustPointsRequestSchema = z.object({
+  amount: z
+    .number({ message: "积分变动必须是数字" })
+    .int({ message: "积分变动必须是整数" })
+    .min(-1_000_000, { message: "积分变动不能小于 -1000000" })
+    .max(1_000_000, { message: "积分变动不能大于 1000000" })
+    .refine((value) => value !== 0, { message: "积分变动不能为 0" }),
+  note: z.string().trim().max(200, { message: "备注最多 200 字" }).optional(),
+});
+
+export const adminAdjustPointsResponseSchema = z.object({
+  user: publicUserSchema,
+  transaction: z.object({
+    id: z.number().int().positive(),
+    amount: z.number().int(),
+    balanceAfter: z.number().int().nonnegative(),
+    reason: z.literal("admin_adjust"),
+    note: z.string().nullable(),
+    createdAt: z.string(),
+  }),
+});
+
 export type AdminCreateUserRequest = z.infer<typeof adminCreateUserRequestSchema>;
 export type AdminUserListQuery = z.infer<typeof adminUserListQuerySchema>;
 export type AdminUserListResponse = z.infer<typeof adminUserListResponseSchema>;
+export type AdminAdjustPointsRequest = z.infer<
+  typeof adminAdjustPointsRequestSchema
+>;
+export type AdminAdjustPointsResponse = z.infer<
+  typeof adminAdjustPointsResponseSchema
+>;

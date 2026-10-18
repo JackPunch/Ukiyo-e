@@ -39,6 +39,8 @@ export function useCreateTask() {
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["tasks", "history"] });
+      void queryClient.invalidateQueries({ queryKey: ["points", "transactions"] });
+      void queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
     },
   });
 }

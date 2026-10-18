@@ -53,6 +53,13 @@ export interface ListPointTransactionsResult {
   total: number;
 }
 
+export class InsufficientPointsError extends Error {
+  constructor() {
+    super("Insufficient points");
+    this.name = "InsufficientPointsError";
+  }
+}
+
 const COLUMNS = `id, user_id, amount, balance_after, reason, ref_type, ref_id,
   note, created_by, created_at`;
 
@@ -60,7 +67,7 @@ const COLUMNS = `id, user_id, amount, balance_after, reason, ref_type, ref_id,
  * Appends a ledger entry and updates `users.points_balance` in one atomic step
  * — the balance is a cache, the ledger is the source of truth. Returns the new
  * row. Throws if the user is unknown or the change would drive the balance
- * below zero (the `users` CHECK rejects it and the update rolls back).
+ * below zero (reported as InsufficientPointsError and rolled back).
  *
  * Uses a SAVEPOINT rather than BEGIN so it nests safely inside a caller's
  * transaction, e.g. creating a task and charging points together.
@@ -80,6 +87,9 @@ export function recordPointTransaction(
     }
 
     const balanceAfter = account.points_balance + input.amount;
+    if (balanceAfter < 0) {
+      throw new InsufficientPointsError();
+    }
 
     db.prepare(
       `UPDATE users

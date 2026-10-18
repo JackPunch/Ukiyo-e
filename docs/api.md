@@ -102,6 +102,7 @@
 | `forbidden` | `403` | 已登录但权限不足 | 非 `admin` 访问管理端点 | 提示无权限；不要重试 |
 | `not_found` | `404` | 接口不存在 | 路径未匹配任何路由；或路径存在但方法不匹配 | 检查路径/方法（通常是代码问题，不是运行时错误） |
 | `email_taken` | `409` | 邮箱已被注册 | 注册邮箱重复，含 `A@B.com` / `a@b.com` 这类大小写变体 | 提示已注册并引导去登录 |
+| `insufficient_points` | `400` | 积分余额不足 | 管理员扣减积分或业务扣费会使余额低于 0 | 提示用户充值或减少扣减 |
 | `internal_error` | `500` / `502` | 服务器内部错误或上游 AI 服务不可用 | 未预期异常、数据库故障、AI Key 未配置、AI 服务超时/拒绝请求等（**真实原因只记服务端日志，不返回**） | 提示稍后重试；不要展示原始信息 |
 
 补充说明：
@@ -313,6 +314,30 @@ set-cookie: ukiyo_session=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00
 }
 ```
 
+### 4.8 `PATCH /api/admin/users/:userId/points`
+
+管理员调整指定用户的积分。鉴权：**需要**，且需管理员。正数充值，负数扣减；余额不能低于 0，调整会写入积分流水并记录当前管理员。
+
+请求体：
+
+| 字段 | 类型 | 必填 | 约束 |
+| --- | --- | --- | --- |
+| `amount` | integer | 是 | 非零，范围 `-1000000–1000000` |
+| `note` | string | 否 | `trim` 后最多 200 字 |
+
+`200 OK`
+
+响应为 `{ user, transaction }`，其中 `user` 是调整后的 `PublicUser`，`transaction` 包含 `id`、`amount`、`balanceAfter`、`reason`（固定为 `admin_adjust`）、`note` 与 `createdAt`。
+
+| 状态码 | `code` | 场景 |
+| --- | --- | --- |
+| `200` | — | 调整成功 |
+| `400` | `validation_error` | 用户 ID 或请求体不合法 |
+| `400` | `insufficient_points` | 扣减后余额低于 0 |
+| `401` | `unauthorized` | 未登录 |
+| `403` | `forbidden` | 已登录但非管理员 |
+| `404` | `not_found` | 用户不存在 |
+
 ## 5. 数据模型
 
 ### 5.1 `PublicUser`
@@ -329,7 +354,7 @@ set-cookie: ukiyo_session=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00
 | `lastLoginAt` | string \| null | 是 | 最近登录时间；注册后未登录过为 `null` |
 | `createdAt` | string | 否 | 注册时间 |
 
-### 4.8 Mock provider task API
+### 4.9 Mock provider task API
 
 用于测试 Kie.ai Market 任务客户端，不访问外部服务、不消耗积分。鉴权：**不需要**。
 接口返回格式仿照 [bananaAPI.md](./bananaAPI.md) 与
@@ -398,11 +423,49 @@ set-cookie: ukiyo_session=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00
 
 请求参数校验失败仍遵循本 API 的统一错误信封，返回 `400 validation_error`。
 
-### 4.9 `POST /api/tasks`
+### 4.10 `GET /api/points/transactions`
+
+查询当前登录用户的积分变化记录。鉴权：**需要**。服务端始终按当前会话用户过滤，客户端不能查看其他用户的流水。
+
+| 参数 | 位置 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- | --- |
+| `limit` | query | int `1–100` | 否 | `20` | 每页条数 |
+| `offset` | query | int `≥0` | 否 | `0` | 跳过的条数 |
+
+`200 OK`
+
+```jsonc
+{
+  "items": [
+    {
+      "id": 12,
+      "amount": -1,
+      "balanceAfter": 8,
+      "reason": "task_spend",
+      "refType": "task",
+      "refId": 42,
+      "note": null,
+      "createdAt": "2026-10-18T08:00:00.000Z"
+    }
+  ],
+  "total": 1,
+  "limit": 20,
+  "offset": 0
+}
+```
+
+| 状态码 | `code` | 场景 |
+| --- | --- | --- |
+| `200` | — | 返回当前用户的积分流水 |
+| `400` | `validation_error` | 分页参数不合法 |
+| `401` | `unauthorized` | 未登录 |
+
+### 4.11 `POST /api/tasks`
 
 创建一个 Nano Banana 2.1 图片生成任务。鉴权：**需要登录**。
-服务端会同步调用 Kie.ai 的创建任务接口；后台 Worker 随后轮询供应商并更新本地状态，
-本步骤不下载或展示最终图片。
+服务端会先检查并扣除固定 **1 积分**，再同步调用 Kie.ai 的创建任务接口；后台 Worker
+随后轮询供应商并更新本地状态，本步骤不下载或展示最终图片。若供应商请求失败，
+服务端会把任务标记为失败并自动记录 `task_refund` 退回 1 积分。
 
 请求体字段与 [Mock provider task API](#48-mock-provider-task-api) 相同：
 
@@ -436,11 +499,12 @@ set-cookie: ukiyo_session=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00
 | --- | --- | --- |
 | `200` | — | 供应商已接受任务 |
 | `400` | `validation_error` | 请求参数不合法 |
+| `400` | `insufficient_points` | 积分余额不足，不会调用供应商 |
 | `401` | `unauthorized` | 未登录 |
 | `500` | `internal_error` | 服务端未配置 `KIE_API_KEY` |
 | `502` | `internal_error` | 供应商超时、不可用、响应无效或拒绝任务 |
 
-### 4.10 `GET /api/tasks/:taskId`
+### 4.12 `GET /api/tasks/:taskId`
 
 查询当前登录用户拥有的任务状态。鉴权：**需要登录**。后台 Worker 会把供应商状态映射为
 `queued`（排队中）、`running`（生成中）、`succeeded`（成功）或 `failed`（失败）。
@@ -479,7 +543,7 @@ set-cookie: ukiyo_session=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00
 | `401` | `unauthorized` | 未登录 |
 | `404` | `not_found` | 任务不存在或不属于当前用户 |
 
-### 4.11 `GET /api/images/:imageId`
+### 4.13 `GET /api/images/:imageId`
 
 读取当前登录用户任务中的已保存图片。图片不会直接暴露供应商临时 URL，服务端会先校验
 图片所属任务和当前用户，再从 `STORAGE_ROOT` 读取文件。鉴权：**需要登录**。
@@ -493,7 +557,7 @@ set-cookie: ukiyo_session=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00
 | `401` | `unauthorized` | 未登录 |
 | `404` | `not_found` | 图片不存在、不属于当前用户或文件已丢失 |
 
-### 4.12 `GET /api/tasks`
+### 4.14 `GET /api/tasks`
 
 查询当前登录用户的历史任务，按创建时间倒序返回。鉴权：**需要登录**。
 

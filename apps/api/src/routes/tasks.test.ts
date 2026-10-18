@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SESSION_COOKIE_NAME } from "../auth/cookie";
 import { createTask, findTaskById } from "../db/queries/tasks";
+import { recordPointTransaction } from "../db/queries/point-transactions";
 import { buildTestServer } from "../test-support";
 
 describe("POST /api/tasks", () => {
@@ -32,6 +33,11 @@ describe("POST /api/tasks", () => {
       (cookie) => cookie.name === SESSION_COOKIE_NAME,
     );
     const userId = registered.json().user.id;
+    recordPointTransaction(app.db, {
+      userId,
+      amount: 1,
+      reason: "admin_adjust",
+    });
 
     const response = await app.inject({
       method: "POST",
@@ -84,6 +90,11 @@ describe("POST /api/tasks", () => {
       payload: { email: "status@example.com", password: "password1234" },
     });
     const session = registered.cookies[0]!.value;
+    recordPointTransaction(app.db, {
+      userId: registered.json().user.id,
+      amount: 1,
+      reason: "admin_adjust",
+    });
     const created = await app.inject({
       method: "POST",
       url: "/api/tasks",
@@ -136,6 +147,70 @@ describe("POST /api/tasks", () => {
       offset: 0,
       items: [{ prompt: "History task", status: "queued" }],
     });
+    await app.close();
+  });
+
+  it("rejects users without enough points before calling the provider", async () => {
+    process.env.KIE_API_KEY = "test-key";
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    const app = await buildTestServer();
+    const registered = await app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      payload: { email: "poor@example.com", password: "password1234" },
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/tasks",
+      cookies: { [SESSION_COOKIE_NAME]: registered.cookies[0]!.value },
+      payload: { model: "nano-banana-2-1", input: { prompt: "No points" } },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe("insufficient_points");
+    expect(fetchMock).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("refunds points when the provider fails", async () => {
+    process.env.KIE_API_KEY = "test-key";
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
+    const app = await buildTestServer();
+    const registered = await app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      payload: { email: "refund@example.com", password: "password1234" },
+    });
+    const userId = registered.json().user.id;
+    recordPointTransaction(app.db, {
+      userId,
+      amount: 1,
+      reason: "admin_adjust",
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/tasks",
+      cookies: { [SESSION_COOKIE_NAME]: registered.cookies[0]!.value },
+      payload: { model: "nano-banana-2-1", input: { prompt: "Refund me" } },
+    });
+
+    expect(response.statusCode).toBe(502);
+    expect(
+      (app.db.prepare("SELECT points_balance FROM users WHERE id = ?").get(userId) as {
+        points_balance: number;
+      }).points_balance,
+    ).toBe(1);
+    expect(
+      app.db
+        .prepare("SELECT reason, amount FROM point_transactions WHERE user_id = ? ORDER BY id")
+        .all(userId),
+    ).toMatchObject([
+      { reason: "admin_adjust", amount: 1 },
+      { reason: "task_spend", amount: -1 },
+      { reason: "task_refund", amount: 1 },
+    ]);
     await app.close();
   });
 });

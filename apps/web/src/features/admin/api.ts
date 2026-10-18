@@ -1,4 +1,5 @@
 import type {
+  AdminAdjustPointsRequest,
   AdminCreateUserRequest,
   AdminUserListResponse,
   PublicUser,
@@ -30,4 +31,14 @@ export async function createUser(
   });
 
   return user;
+}
+
+export async function adjustUserPoints(
+  userId: number,
+  input: AdminAdjustPointsRequest,
+): Promise<void> {
+  await apiFetch(`/admin/users/${userId}/points`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
 }

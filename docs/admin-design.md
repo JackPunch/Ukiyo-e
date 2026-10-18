@@ -1,11 +1,11 @@
 # 管理员系统设计文档
 
-> 对应开发路线图（见 [note.md](../note.md)）**第 4 步：加入管理员系统，管理员可以创建/查找用户**。
+> 对应开发路线图（见 [note.md](../note.md)）**第 4 步：加入管理员系统，管理员可以创建/查找用户**，以及第 8 步的积分管理。
 > 本文档是该步骤的**需求与产物定义**，也是实现前的唯一设计依据。
 >
 > 前置阅读：[auth-design.md](./auth-design.md)（鉴权中间件、会话形态）、[database-design.md](./database-design.md)（`users` 表与 §7.1 管理员系统扩展）、[api.md](./api.md)（接口契约与错误码单一事实来源）。
 >
-> **本步骤不新增表、不新增错误码、不新增环境变量**：管理员只是 `users.role = 'admin'`，授权入口与错误信封已在第 3 步落地。
+> **本步骤不新增表、不新增环境变量**：管理员只是 `users.role = 'admin'`，授权入口与错误信封已在第 3 步落地；积分调整复用既有流水表，并新增明确的余额不足错误码。
 
 ## 1. 背景与范围
 
@@ -37,7 +37,7 @@
 | --- | --- |
 | 修改他人角色（提升/降权） | 路线图第 4 步只要求"创建/查找"；已在本次决策中显式排除（见 §10 D1），角色变更留待后续按需单开 |
 | 启用 / 禁用、删除用户 | 路线图未列；删除语义已在 [database-design.md §8 D4/D14](./database-design.md) 记录（有引用则拒绝） |
-| 管理用户积分（充值/扣减/查看流水） | 路线图**第 8 步**；创建用户时余额固定 `0` |
+| 管理用户积分（充值/扣减/查看流水） | 已在本次收尾实现调整接口；流水查询端点暂不开放 |
 | 编辑用户资料（改邮箱/展示名/重置密码） | 未列入路线图；需要时另开 |
 | `GET /api/admin/users/:id` 单用户详情 | 列表 + 关键词检索已覆盖"查找"；详情端点按需再加 |
 | 管理员操作审计日志（`admin_audit_log`） | [database-design.md §7.1](./database-design.md) 的**可选**演进项，本步骤不建表 |
@@ -49,6 +49,7 @@
 **后端**
 
 - [x] `apps/api/src/routes/admin-users.ts`：`adminUsersRoutes` 插件，注册 `POST /admin/users`、`GET /admin/users`
+- [x] `apps/api/src/routes/admin-users.ts`：注册 `PATCH /admin/users/:userId/points`，仅管理员可调整积分
 - [x] `apps/api/src/server.ts`：`app.register(adminUsersRoutes, { prefix: "/api" })`
 - [x] `apps/api/src/db/queries/users.ts`：`ListUsersOptions` 增加 `search?: string`，`listUsers` 据此过滤（保持向后兼容）
 

@@ -130,6 +130,39 @@
   color: var(--text-h);
 }
 
+.points {
+  width: min(680px, 100%);
+  text-align: left;
+}
+
+.points h2 {
+  margin-bottom: 12px;
+}
+
+.pointsList {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.pointsList li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.credit {
+  color: #2d8a4e;
+}
+
+.debit {
+  color: #d64545;
+}
+
 .actions {
   display: flex;
   gap: 12px;

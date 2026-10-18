@@ -69,6 +69,7 @@
 }
 
 .submit,
+.action,
 .search button,
 .pager button {
   padding: 10px 16px;
@@ -81,9 +82,15 @@
 }
 
 .submit:disabled,
+.action:disabled,
 .pager button:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+.action {
+  padding: 6px 10px;
+  font-size: 13px;
 }
 
 .searchRow {

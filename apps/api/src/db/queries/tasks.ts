@@ -155,6 +155,20 @@ export function updateTaskStatus(
   );
 }
 
+/** Stores the provider id after a charged task is accepted by the provider. */
+export function setTaskProviderTaskId(
+  db: DatabaseSync,
+  id: number,
+  providerTaskId: string,
+): void {
+  db.prepare(
+    `UPDATE tasks
+     SET params = json_set(COALESCE(params, '{}'), '$.providerTaskId', ?),
+         updated_at = ?
+     WHERE id = ?`,
+  ).run(providerTaskId, new Date().toISOString(), id);
+}
+
 /**
  * Returns one page of a user's tasks, newest first, plus the total count.
  * `userId` is required; `status` is an optional extra filter. Both are applied

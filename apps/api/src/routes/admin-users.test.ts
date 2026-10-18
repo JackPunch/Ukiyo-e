@@ -205,4 +205,75 @@ describe("admin user routes", () => {
       }
     });
   });
+
+  describe("PATCH /api/admin/users/:userId/points", () => {
+    it("allows only admins to adjust a user's points", async () => {
+      const admin = await cookiesFor("admin@b.com", "admin");
+      const user = createUser(app.db, {
+        email: "user@b.com",
+        passwordHash: "hash",
+      });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/api/admin/users/${user.id}/points`,
+        cookies: admin,
+        payload: { amount: 50, note: "活动奖励" },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({
+        user: { id: user.id, pointsBalance: 50 },
+        transaction: {
+          amount: 50,
+          balanceAfter: 50,
+          reason: "admin_adjust",
+          note: "活动奖励",
+        },
+      });
+    });
+
+    it("rejects regular users, invalid input, unknown users, and overdrafts", async () => {
+      const regular = await cookiesFor("regular@b.com");
+      const admin = await cookiesFor("admin@b.com", "admin");
+      const user = createUser(app.db, {
+        email: "user@b.com",
+        passwordHash: "hash",
+      });
+
+      const forbidden = await app.inject({
+        method: "PATCH",
+        url: `/api/admin/users/${user.id}/points`,
+        cookies: regular,
+        payload: { amount: 1 },
+      });
+      expect(forbidden.statusCode).toBe(403);
+
+      const invalid = await app.inject({
+        method: "PATCH",
+        url: `/api/admin/users/${user.id}/points`,
+        cookies: admin,
+        payload: { amount: 0 },
+      });
+      expect(invalid.statusCode).toBe(400);
+      expect(invalid.json().error.code).toBe("validation_error");
+
+      const missing = await app.inject({
+        method: "PATCH",
+        url: "/api/admin/users/9999/points",
+        cookies: admin,
+        payload: { amount: 1 },
+      });
+      expect(missing.statusCode).toBe(404);
+
+      const overdraw = await app.inject({
+        method: "PATCH",
+        url: `/api/admin/users/${user.id}/points`,
+        cookies: admin,
+        payload: { amount: -1 },
+      });
+      expect(overdraw.statusCode).toBe(400);
+      expect(overdraw.json().error.code).toBe("insufficient_points");
+    });
+  });
 });

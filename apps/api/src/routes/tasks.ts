@@ -8,12 +8,24 @@ import {
   taskStatusResponseSchema,
 } from "@ukiyo-e/shared";
 import type { FastifyInstance } from "fastify";
-import { createTask, findTaskById, listTasks } from "../db/queries/tasks";
+import {
+  createTask,
+  deleteTask,
+  findTaskById,
+  listTasks,
+  setTaskProviderTaskId,
+  updateTaskStatus,
+} from "../db/queries/tasks";
 import { listImagesByTask } from "../db/queries/images";
+import {
+  InsufficientPointsError,
+  recordPointTransaction,
+} from "../db/queries/point-transactions";
 import { sendValidationError } from "./helpers";
 
 const KIE_CREATE_TASK_URL = "https://api.kie.ai/api/v1/jobs/createTask";
 const KIE_TIMEOUT_MS = 30_000;
+const TASK_POINTS_COST = 1;
 
 export async function taskRoutes(app: FastifyInstance): Promise<void> {
   app.get(
@@ -65,6 +77,44 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
           .send(errorBody("internal_error", "服务未配置 AI 供应商"));
       }
 
+      const task = createTask(app.db, {
+        userId: request.user!.id,
+        prompt: parsed.data.input.prompt,
+        model: parsed.data.model,
+        params: parsed.data,
+        pointsCost: TASK_POINTS_COST,
+      });
+      try {
+        recordPointTransaction(app.db, {
+          userId: request.user!.id,
+          amount: -TASK_POINTS_COST,
+          reason: "task_spend",
+          refType: "task",
+          refId: task.id,
+        });
+      } catch (error) {
+        deleteTask(app.db, task.id);
+        if (error instanceof InsufficientPointsError) {
+          return reply
+            .status(400)
+            .send(errorBody("insufficient_points", "积分余额不足"));
+        }
+        throw error;
+      }
+
+      const refundTask = () => {
+        updateTaskStatus(app.db, task.id, "failed", {
+          error: "AI 任务创建失败",
+        });
+        recordPointTransaction(app.db, {
+          userId: request.user!.id,
+          amount: TASK_POINTS_COST,
+          reason: "task_refund",
+          refType: "task",
+          refId: task.id,
+        });
+      };
+
       let providerResponse: Response;
       try {
         providerResponse = await fetch(KIE_CREATE_TASK_URL, {
@@ -78,6 +128,7 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
         });
       } catch (error) {
         request.log.error({ err: error }, "AI provider request failed");
+        refundTask();
         return reply
           .status(502)
           .send(errorBody("internal_error", "AI 服务暂时不可用，请稍后重试"));
@@ -88,6 +139,7 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
         providerBody = await providerResponse.json();
       } catch (error) {
         request.log.error({ err: error }, "AI provider returned invalid JSON");
+        refundTask();
         return reply
           .status(502)
           .send(errorBody("internal_error", "AI 服务返回了无效响应"));
@@ -105,18 +157,14 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
           { status: providerResponse.status, body: providerBody },
           "AI provider rejected task",
         );
+        refundTask();
         return reply
           .status(502)
           .send(errorBody("internal_error", "AI 任务创建失败，请稍后重试"));
       }
 
       const providerTaskId = providerResult.data.data.taskId;
-      const task = createTask(app.db, {
-        userId: request.user!.id,
-        prompt: parsed.data.input.prompt,
-        model: parsed.data.model,
-        params: { ...parsed.data, providerTaskId },
-      });
+      setTaskProviderTaskId(app.db, task.id, providerTaskId);
 
       return reply.send(
         createImageTaskResponseSchema.parse({

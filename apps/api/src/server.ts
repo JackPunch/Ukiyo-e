@@ -13,6 +13,7 @@ import { healthRoutes } from "./routes/health";
 import { imageRoutes } from "./routes/images";
 import { mockProviderRoutes } from "./routes/mock-provider";
 import { taskRoutes } from "./routes/tasks";
+import { pointsRoutes } from "./routes/points";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -89,6 +90,7 @@ export async function buildServer(
   app.register(adminUsersRoutes, { prefix: "/api" });
   app.register(mockProviderRoutes, { prefix: "/api" });
   app.register(taskRoutes, { prefix: "/api" });
+  app.register(pointsRoutes, { prefix: "/api" });
 
   return app;
 }

@@ -1,5 +1,7 @@
 import {
   adminCreateUserRequestSchema,
+  adminAdjustPointsRequestSchema,
+  adminAdjustPointsResponseSchema,
   adminUserListQuerySchema,
   errorBody,
 } from "@ukiyo-e/shared";
@@ -9,9 +11,14 @@ import { toPublicUser } from "../auth/public-user";
 import {
   createUser,
   findUserByEmail,
+  findUserById,
   listUsers,
   type UserRow,
 } from "../db/queries/users";
+import {
+  InsufficientPointsError,
+  recordPointTransaction,
+} from "../db/queries/point-transactions";
 import { isUniqueViolation, sendValidationError } from "./helpers";
 
 /**
@@ -76,6 +83,64 @@ export async function adminUsersRoutes(app: FastifyInstance): Promise<void> {
         limit,
         offset,
       });
+    },
+  );
+
+  app.patch(
+    "/admin/users/:userId/points",
+    { preHandler: guards },
+    async (request, reply) => {
+      const userId = Number((request.params as { userId: string }).userId);
+      if (!Number.isSafeInteger(userId) || userId <= 0) {
+        return reply
+          .status(400)
+          .send(errorBody("validation_error", "用户 ID 不合法"));
+      }
+
+      const parsed = adminAdjustPointsRequestSchema.safeParse(request.body);
+      if (!parsed.success) return sendValidationError(reply, parsed.error);
+
+      const user = findUserById(app.db, userId);
+      if (!user) {
+        return reply.status(404).send(errorBody("not_found", "用户不存在"));
+      }
+
+      let transaction;
+      try {
+        transaction = recordPointTransaction(app.db, {
+          userId,
+          amount: parsed.data.amount,
+          reason: "admin_adjust",
+          note: parsed.data.note ?? null,
+          createdBy: request.user!.id,
+        });
+      } catch (error) {
+        if (error instanceof InsufficientPointsError) {
+          return reply
+            .status(400)
+            .send(errorBody("insufficient_points", "用户积分余额不足"));
+        }
+        throw error;
+      }
+
+      const updatedUser = findUserById(app.db, userId);
+      if (!updatedUser) {
+        throw new Error(`User disappeared after points adjustment: ${userId}`);
+      }
+
+      return reply.send(
+        adminAdjustPointsResponseSchema.parse({
+          user: toPublicUser(updatedUser),
+          transaction: {
+            id: transaction.id,
+            amount: transaction.amount,
+            balanceAfter: transaction.balance_after,
+            reason: transaction.reason,
+            note: transaction.note,
+            createdAt: transaction.created_at,
+          },
+        }),
+      );
     },
   );
 }

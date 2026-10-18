@@ -9,6 +9,7 @@ import { authRoutes } from "./routes/auth";
 import { healthRoutes } from "./routes/health";
 import { mockProviderRoutes } from "./routes/mock-provider";
 import { taskRoutes } from "./routes/tasks";
+import { pointsRoutes } from "./routes/points";
 
 const repoRoot = join(import.meta.dirname, "..", "..", "..");
 const apiDoc = readFileSync(join(repoRoot, "docs", "api.md"), "utf8");
@@ -40,6 +41,7 @@ async function registeredRoutes(): Promise<string[]> {
   app.register(adminUsersRoutes, { prefix: "/api" });
   app.register(mockProviderRoutes, { prefix: "/api" });
   app.register(taskRoutes, { prefix: "/api" });
+  app.register(pointsRoutes, { prefix: "/api" });
   await app.ready();
   await app.close();
 

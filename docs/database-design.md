@@ -229,7 +229,7 @@ CREATE INDEX idx_point_tx_user_created
 - **流水为准、余额为缓存**：查询余额走 `users.points_balance`（快），查明细走流水。`balance_after` 便于核对「余额 = 最后一条流水的 `balance_after`」，排查并发 / 回滚问题。
 - **原子写入**：`recordPointTransaction` 用 `SAVEPOINT`（而非 `BEGIN`）包住「读余额 → 更新余额 → 插流水」：既保证原子提交，又能在调用方已有事务时安全嵌套（如第 8 步「创建任务 + 扣积分」）。余额不足时 `users` 的 `CHECK (points_balance >= 0)` 会拒绝并整体回滚，不产生半条记录。
 - **`reason` 取值**：修改 CHECK 需重建表，故实现时集中定义、审慎增补（如将来加 `'daily_reward'`）。
-- **与任务的关系**：`task_spend` / `task_refund` 通过 `ref_type='task'` + `ref_id` 指向任务（见 §4），**不在此处建外键**，保持流水表与业务表松耦合。
+- **与任务的关系**：`task_spend` / `task_refund` 通过 `ref_type='task'` + `ref_id` 指向任务（见 §4），**不在此处建外键**，保持流水表与业务表松耦合。当前每个任务固定消耗 1 积分；供应商失败时自动退款。
 - **删除保护**：`user_id` 用默认 `NO ACTION`——用户仍持有流水时**禁止删除该用户**（与 D4、`tasks.user_id` 一致），账本不会被静默清空；`created_by` 同样不级联（留痕）。若将来要支持带引用删用户，再引入软删除。
 
 ## 7. 面向未来的扩展设计
@@ -240,7 +240,7 @@ CREATE INDEX idx_point_tx_user_created
 
 - 授权：在 Fastify 侧增加 `requireAdmin` 前置钩子，读取当前登录用户的 `role`，非 `admin` 返回 403。属于接口层，不进表结构。
 - **已落地（路线图第 4 步）**：`requireAdmin` 与两个管理端点（`POST /api/admin/users` 创建、`GET /api/admin/users` 分页检索）。**不新增表**——管理员就是 `role='admin'` 的用户，创建用户固定 `role='user'`（详见 [admin-design.md](./admin-design.md)）。
-- 管理员「管理用户」的其余部分（改 `role`/`points_balance`、删除用户、启用/禁用）**尚未实现**，按路线图留待后续步骤（积分见第 8 步）。
+- 管理员调积分已落地：`PATCH /api/admin/users/:userId/points` 通过 `recordPointTransaction` 原子更新余额和 `admin_adjust` 流水，禁止余额变负。
 - 建议（可选，后续加）：`admin_audit_log` 表，记录「谁在何时改了谁的什么」，例如：
 
 ```sql
@@ -288,5 +288,5 @@ CREATE TABLE admin_audit_log (
 3. ✅ 已落地（§4、§5）：迁移 `apps/api/src/db/migrations/0003_tasks_images.sql` 建 `tasks`、`images` 表与索引；查询模块 `apps/api/src/db/queries/tasks.ts`（创建 / 查找 / 分页 `listTasks` / 删除）与 `images.ts`（创建 / 查找 / 删除），风格对齐 `users.ts`，含 Vitest 测试。
 4. ✅ 已落地（§6）：迁移 `apps/api/src/db/migrations/0004_point_transactions.sql` 建 `point_transactions` 表与索引；查询模块 `apps/api/src/db/queries/point-transactions.ts` 提供 `recordPointTransaction`（原子记账）/ `findPointTransactionById` / `listPointTransactions`，含 Vitest 测试。
 5. 图片落盘与 `STORAGE_ROOT` 已在第 7 步实现；Worker 成功后下载图片，SQLite 保存元数据。
-6. 第 8 步接入业务时，用 `recordPointTransaction` 记录 `signup_bonus` / `task_spend` / `task_refund`，并复用其原子事务。
-7. 管理员上线时再加 `requireAdmin` 钩子（§7.1）。<br>✅ 已落地（第 4 步）：`requireAdmin` + `apps/api/src/routes/admin-users.ts` 的创建/检索端点；`listUsers` 增加 `search` 过滤。设计见 [admin-design.md](./admin-design.md)。
+6. ✅ 第 8 步已接入业务：每个任务固定消耗 1 积分，用 `recordPointTransaction` 记录 `task_spend`；供应商失败记录 `task_refund`，用户可通过积分流水接口查询。
+7. 管理员上线时再加 `requireAdmin` 钩子（§7.1）。<br>✅ 已落地（第 4 步）：`requireAdmin` + `apps/api/src/routes/admin-users.ts` 的创建/检索端点；`listUsers` 增加 `search` 过滤。<br>✅ 已落地（第 8 步）：管理员积分调整端点，复用 `admin_adjust` 流水。设计见 [admin-design.md](./admin-design.md)。
