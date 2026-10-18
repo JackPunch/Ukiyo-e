@@ -1,106 +1,131 @@
 # ukiyo-e
 
-AI 制图工作流网站。前后端统一 TypeScript，npm workspaces 单仓多包。
+AI 制图工作流网站。前后端统一 TypeScript，采用 npm workspaces 单仓多包。
 
-## 技术栈
+## 1. 快速开始
 
-- 前端：React + Vite
-- 后端：Fastify + SQLite（原生 SQL）+ zod
-- 测试：Vitest + Playwright
-- 部署：Docker
-
-## 目录结构
-
-```
-ukiyo-e/
-├── apps/
-│   ├── web/         # 前端（React + Vite）
-│   └── api/         # 后端（Fastify）
-└── packages/
-    └── shared/      # 前后端共享的 zod schema 与类型
-```
-
-## 快速开始
+### 本地开发
 
 ```bash
 npm install
 cp .env.example .env
-
-npm run dev          # 前端 :5173，后端 :3000
+npm run dev
 ```
 
-打开 http://localhost:5173 。开发时 `/api/*` 会被 Vite 代理到后端，无需处理跨域。
+打开 <http://localhost:5173>。
 
-## 常用脚本
+### Docker 部署
 
-```bash
-npm run dev          # 同时启动前端与后端
-npm run dev:web      # 只启动前端
-npm run dev:api      # 只启动后端
-npm run build        # 构建
-npm run typecheck    # 类型检查
-npm run test         # 单元/集成测试（Vitest + inject）
-npm run test:banana  # 使用 .env 中的 KIE_API_KEY 测试 Nano Banana API
-npm run test:e2e     # 端到端测试（Playwright，需先 `npx playwright install chromium`）
-npm run test:e2e:docker  # 对 Docker 部署跑同一套 E2E（需先 docker compose up --build -d）
-npm run lint         # ESLint
+先在根目录 `.env` 中配置必要变量：
+
+```dotenv
+JWT_SECRET=change-this-to-a-long-random-secret
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=change-this-password
+KIE_API_KEY=your-kie-api-key
 ```
 
-E2E 用例在 `e2e/`。默认 [playwright.config.ts](./playwright.config.ts) 自动拉起后端（内存库 + 确定性的引导管理员）与 Vite 前端，无需手动起服务；[playwright.docker.config.ts](./playwright.docker.config.ts) 则**不启动任何服务**，直接打 Docker 部署（nginx :8080）。对 Docker 跑一遍：
+启动服务：
 
 ```bash
-docker compose up --build -d      # 确定性管理员：ADMIN_EMAIL=admin@example.com / ADMIN_PASSWORD=admin-password
+docker compose up --build -d
+```
+
+打开 <http://localhost:8080>。
+
+停止服务：
+
+```bash
+docker compose down
+```
+
+## 2. 常用命令
+
+```bash
+npm run dev              # 同时启动前端和后端
+npm run dev:web          # 只启动前端
+npm run dev:api          # 只启动后端
+npm run build            # 构建所有 workspace
+npm run typecheck        # TypeScript 类型检查
+npm run test             # Vitest 单元测试和集成测试
+npm run lint             # ESLint 检查
+npm run test:e2e         # Playwright E2E 测试
+npm run test:banana      # 使用 KIE_API_KEY 测试 Nano Banana API
+```
+
+运行 E2E 测试前，如本地尚未安装 Chromium：
+
+```bash
+npx playwright install chromium
+```
+
+针对 Docker 部署运行 E2E：
+
+```bash
+docker compose up --build -d
 npm run test:e2e:docker
-docker compose down -v            # -v 一并删掉数据卷
+docker compose down -v
 ```
 
-Docker Compose 会从根目录 `.env` 读取 `KIE_API_KEY`，用于登录后的图片任务创建；
-生成图片和 SQLite 数据统一持久化在 `api-data` 卷（容器内 `/app/data`），图片存储根目录由
-`STORAGE_ROOT` 指定。
-未配置时 Compose 会在启动前明确报错。
+## 3. 技术栈
 
-## 认证与用户系统
+- 前端：React、Vite、TanStack Query、CSS Modules
+- 后端：Fastify、SQLite（Node 原生 `node:sqlite`）、zod
+- 共享层：TypeScript、共享 zod schema
+- 测试：Vitest、Playwright
+- 部署：Docker、nginx
+- 认证：HttpOnly Cookie、无状态 JWT、Node `crypto.scrypt`
 
-会话采用 **httpOnly Cookie + 无状态签名 JWT**（jose，HS256），服务端不存会话；密码用 `node:crypto` 的 **scrypt** 哈希（零依赖）。设计方案见 [docs/auth-design.md](./docs/auth-design.md)，**接口参数、状态码与错误码以 [docs/api.md](./docs/api.md) 为准**（`register` / `login` / `logout` / `me` 四个端点）。
+## 4. 目录结构
 
-前端路由：`/`（需登录的主页）、`/login`、`/register`；未登录访问受保护页面会跳转登录页并在登录后回跳。
+```text
+ukiyo-e/
+├── apps/
+│   ├── web/         # React + Vite 前端
+│   └── api/         # Fastify API、SQLite、Worker
+├── packages/
+│   └── shared/      # 前后端共享的 schema 与类型
+├── docs/            # API、认证、数据库和管理员设计文档
+├── e2e/             # Playwright E2E 测试
+├── docker-compose.yml
+└── package.json
+```
 
-首个管理员由环境变量引导，启动时执行、幂等：`ADMIN_EMAIL` 对应的账号不存在时用 `ADMIN_PASSWORD` 创建；已存在时**只提升角色、不重置密码**。
+## 5. 其他
 
-> 登出只清除浏览器 Cookie：无状态令牌在过期前始终有效，这是该方案的已知取舍（见设计文档 §12.1）。
+### 业务功能
 
-## 文档
+- 用户可以注册、登录、创建图片生成任务和查看任务历史。
+- 每个图片生成任务固定消耗 1 积分；余额不足时不会调用 AI 供应商。
+- AI 供应商创建任务失败时自动退回本次消耗的积分。
+- 用户可以在主页查看积分余额和积分变化记录。
+- 管理员可以创建、查找用户并调整用户积分。
+
+### 图片存储
+
+- 图片默认保存在 `./data`，可通过 `STORAGE_ROOT` 修改。
+- Docker 中通常使用 `/app/data`，数据由 `api-data` 卷持久化。
+- 图片路径为 `${STORAGE_ROOT}/images/{taskId}/`。
+- 文件命名规则为 `{position}-{randomUUID}.{extension}`。
+- 支持 PNG、JPEG 和 WebP。
+- SQLite 只保存图片路径、类型、大小、SHA-256 等元数据。
+- 图片通过鉴权接口 `GET /api/images/:imageId` 读取。
+
+### 数据与配置
+
+- `DATABASE_URL` 的相对路径按 `apps/api/` 解析。
+- 测试使用 `:memory:` 数据库，避免污染本地数据。
+- `JWT_SECRET` 缺失或过短时，API 启动失败。
+- `ADMIN_EMAIL` 和 `ADMIN_PASSWORD` 用于启动时引导管理员。
+- `KIE_API_KEY` 用于调用图片生成供应商。
+- 生产环境应使用 HTTPS，并将 Cookie 配置为 Secure。
+
+### 文档
 
 | 文档 | 内容 |
 | --- | --- |
-| [docs/api.md](./docs/api.md) | **接口文档（单一事实来源）**：基础信息、参数、状态码、全部错误码 |
+| [docs/api.md](./docs/api.md) | API 接口、参数、状态码和错误码的单一事实来源 |
 | [docs/auth-design.md](./docs/auth-design.md) | 认证与用户系统设计 |
-| [docs/admin-design.md](./docs/admin-design.md) | 管理员系统设计（创建/查找用户） |
-| [docs/database-design.md](./docs/database-design.md) | 数据库表设计 |
-| [AGENTS.md](./AGENTS.md) | 面向 AI 编码代理的项目约定，含"接口变化必须同步接口文档"的硬性要求 |
-
-## Docker
-
-```bash
-docker compose up --build     # 构建并启动（前端 http://localhost:8080）
-docker compose up -d          # 后台运行
-docker compose down           # 停止并移除容器
-docker compose logs -f        # 查看日志
-```
-
-前端由 nginx 托管并反向代理 `/api` 到后端，本地只需访问 http://localhost:8080 。
-
-## 设计要点
-
-- `packages/shared` 直接导出 `./src/index.ts`，不打包，前后端共用同一份 zod schema。
-- 后端 `server.ts`（构建实例）与 `index.ts`（监听端口）分离，方便测试用 `app.inject()`。
-- 后端用 `tsx` 直接运行 TS 源码，无需编译产物。
-- 数据库用 Node 内置的 `node:sqlite`（零依赖、无原生编译）。连接与 PRAGMA 见 `apps/api/src/db/client.ts`；`buildServer` 启动时自动执行迁移并把连接挂到 `app.db`，关闭时释放。
-- 迁移是 `apps/api/src/db/migrations/*.sql` 里的原生 SQL，按文件名顺序执行并记录到 `_migrations` 表——新增迁移只要加一个 `0002_xxx.sql`。
-- `DATABASE_URL` 的相对路径按 `apps/api/` 解析（而非 cwd）；测试传入 `:memory:` 得到隔离的内存库。
-- `STORAGE_ROOT` 是图片文件存储根目录，默认 `./data`；Docker 部署使用 `/app/data`。
-- `buildServer()` 是 async：启动时先校验认证配置（`JWT_SECRET` 缺失或过短直接抛错），再迁移数据库、执行管理员引导，最后才监听。
-- 认证配置与两个 `preHandler` 挂在根实例上（`app.authConfig` / `app.requireAuth` / `app.requireAdmin`），路由插件直接继承使用；`request.user` 由 `requireAuth` 写入。
-- 鉴权以数据库为准：令牌只带用户 ID，每次请求回查 `users`，因此改角色立即生效、删用户立即失效。
-- `packages/shared` 里的 zod schema 同时定义请求体、响应体与错误码枚举（`schemas/errors.ts`），后端用同一个 `errorBody()` 组装错误体。
-- 非 2xx 响应一律使用统一错误信封：路由返回的 4xx 之外，Fastify 自身产生的客户端错误（如畸形 JSON、请求体超限）与未匹配路由的 404 也由 `server.ts` 的 `setErrorHandler` / `setNotFoundHandler` 归一到同一格式，完整错误码目录见 [docs/api.md](./docs/api.md)。
+| [docs/admin-design.md](./docs/admin-design.md) | 管理员与积分管理设计 |
+| [docs/database-design.md](./docs/database-design.md) | 数据库表与积分流水设计 |
+| [AGENTS.md](./AGENTS.md) | 项目开发约定 |
