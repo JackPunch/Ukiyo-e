@@ -55,6 +55,8 @@ docker compose down -v            # -v 一并删掉数据卷
 ```
 
 Docker Compose 会从根目录 `.env` 读取 `KIE_API_KEY`，用于登录后的图片任务创建；
+生成图片和 SQLite 数据统一持久化在 `api-data` 卷（容器内 `/app/data`），图片存储根目录由
+`STORAGE_ROOT` 指定。
 未配置时 Compose 会在启动前明确报错。
 
 ## 认证与用户系统
@@ -96,6 +98,7 @@ docker compose logs -f        # 查看日志
 - 数据库用 Node 内置的 `node:sqlite`（零依赖、无原生编译）。连接与 PRAGMA 见 `apps/api/src/db/client.ts`；`buildServer` 启动时自动执行迁移并把连接挂到 `app.db`，关闭时释放。
 - 迁移是 `apps/api/src/db/migrations/*.sql` 里的原生 SQL，按文件名顺序执行并记录到 `_migrations` 表——新增迁移只要加一个 `0002_xxx.sql`。
 - `DATABASE_URL` 的相对路径按 `apps/api/` 解析（而非 cwd）；测试传入 `:memory:` 得到隔离的内存库。
+- `STORAGE_ROOT` 是图片文件存储根目录，默认 `./data`；Docker 部署使用 `/app/data`。
 - `buildServer()` 是 async：启动时先校验认证配置（`JWT_SECRET` 缺失或过短直接抛错），再迁移数据库、执行管理员引导，最后才监听。
 - 认证配置与两个 `preHandler` 挂在根实例上（`app.authConfig` / `app.requireAuth` / `app.requireAdmin`），路由插件直接继承使用；`request.user` 由 `requireAuth` 写入。
 - 鉴权以数据库为准：令牌只带用户 ID，每次请求回查 `users`，因此改角色立即生效、删用户立即失效。

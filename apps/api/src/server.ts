@@ -10,6 +10,7 @@ import { migrate } from "./db/migrate";
 import { adminUsersRoutes } from "./routes/admin-users";
 import { authRoutes } from "./routes/auth";
 import { healthRoutes } from "./routes/health";
+import { imageRoutes } from "./routes/images";
 import { mockProviderRoutes } from "./routes/mock-provider";
 import { taskRoutes } from "./routes/tasks";
 
@@ -83,6 +84,7 @@ export async function buildServer(
   });
 
   app.register(healthRoutes, { prefix: "/api" });
+  app.register(imageRoutes, { prefix: "/api" });
   app.register(authRoutes, { prefix: "/api" });
   app.register(adminUsersRoutes, { prefix: "/api" });
   app.register(mockProviderRoutes, { prefix: "/api" });

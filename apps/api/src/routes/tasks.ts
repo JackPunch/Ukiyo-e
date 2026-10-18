@@ -9,6 +9,7 @@ import {
 } from "@ukiyo-e/shared";
 import type { FastifyInstance } from "fastify";
 import { createTask, findTaskById, listTasks } from "../db/queries/tasks";
+import { listImagesByTask } from "../db/queries/images";
 import { sendValidationError } from "./helpers";
 
 const KIE_CREATE_TASK_URL = "https://api.kie.ai/api/v1/jobs/createTask";
@@ -154,6 +155,15 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
           updatedAt: task.updated_at,
           startedAt: task.started_at,
           finishedAt: task.finished_at,
+          images: listImagesByTask(app.db, task.id).map((image) => ({
+            imageId: image.id,
+            position: image.position,
+            url: `/api/images/${image.id}`,
+            mimeType: image.mime_type,
+            width: image.width,
+            height: image.height,
+            fileSize: image.file_size,
+          })),
         }),
       );
     },

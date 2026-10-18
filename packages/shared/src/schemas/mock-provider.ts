@@ -54,6 +54,17 @@ export const taskStatusResponseSchema = z.object({
   updatedAt: z.string(),
   startedAt: z.string().nullable(),
   finishedAt: z.string().nullable(),
+  images: z.array(
+    z.object({
+      imageId: z.number().int().positive(),
+      position: z.number().int().nonnegative(),
+      url: z.string(),
+      mimeType: z.string(),
+      width: z.number().int().positive().nullable(),
+      height: z.number().int().positive().nullable(),
+      fileSize: z.number().int().nonnegative().nullable(),
+    }),
+  ),
 });
 export type TaskStatusResponse = z.infer<typeof taskStatusResponseSchema>;
 

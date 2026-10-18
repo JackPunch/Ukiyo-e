@@ -166,6 +166,18 @@ export function HomePage() {
                 </>
               )}
             </dl>
+            {taskStatus.data.images.length > 0 && (
+              <div className={styles.imageGrid}>
+                {taskStatus.data.images.map((image) => (
+                  <img
+                    key={image.imageId}
+                    src={image.url}
+                    alt={taskStatus.data.prompt}
+                    className={styles.generatedImage}
+                  />
+                ))}
+              </div>
+            )}
           </section>
         )}
 

@@ -45,8 +45,8 @@ describe("task worker", () => {
               model: "nano-banana-2-1",
               state: "success",
               param: "{}",
-              resultJson: JSON.stringify({ resultUrls: [] }),
-              response: { resultUrls: [] },
+              resultJson: JSON.stringify({ resultUrls: ["https://images.example/test.png"] }),
+              response: { resultUrls: ["https://images.example/test.png"] },
               failCode: null,
               failMsg: null,
               costTime: 1,
@@ -55,6 +55,14 @@ describe("task worker", () => {
               creditsConsumed: 4,
             },
           }),
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          Uint8Array.from([
+            0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+          ]),
+          { status: 200, headers: { "content-type": "image/png" } },
         ),
       );
     const app = await buildTestServer();
@@ -74,7 +82,7 @@ describe("task worker", () => {
     expect(findTaskById(app.db, task.id)?.status).toBe("running");
     await runTaskWorkerOnce(app.db, app.log);
     expect(findTaskById(app.db, task.id)?.status).toBe("succeeded");
-    expect(providerFetch).toHaveBeenCalledTimes(2);
+    expect(providerFetch).toHaveBeenCalledTimes(3);
     await app.close();
   });
 });

@@ -457,7 +457,18 @@ set-cookie: ukiyo_session=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00
   "createdAt": "2026-10-18T07:00:00.000Z",
   "updatedAt": "2026-10-18T07:00:02.000Z",
   "startedAt": "2026-10-18T07:00:01.000Z",
-  "finishedAt": null
+  "finishedAt": null,
+  "images": [
+    {
+      "imageId": 10,
+      "position": 0,
+      "url": "/api/images/10",
+      "mimeType": "image/webp",
+      "width": null,
+      "height": null,
+      "fileSize": 234567
+    }
+  ]
 }
 ```
 
@@ -468,7 +479,21 @@ set-cookie: ukiyo_session=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00
 | `401` | `unauthorized` | 未登录 |
 | `404` | `not_found` | 任务不存在或不属于当前用户 |
 
-### 4.11 `GET /api/tasks`
+### 4.11 `GET /api/images/:imageId`
+
+读取当前登录用户任务中的已保存图片。图片不会直接暴露供应商临时 URL，服务端会先校验
+图片所属任务和当前用户，再从 `STORAGE_ROOT` 读取文件。鉴权：**需要登录**。
+
+成功时返回图片二进制内容，`Content-Type` 使用图片保存时记录的 MIME 类型。
+
+| 状态码 | `code` | 场景 |
+| --- | --- | --- |
+| `200` | — | 返回图片文件 |
+| `400` | `validation_error` | `imageId` 不是正整数 |
+| `401` | `unauthorized` | 未登录 |
+| `404` | `not_found` | 图片不存在、不属于当前用户或文件已丢失 |
+
+### 4.12 `GET /api/tasks`
 
 查询当前登录用户的历史任务，按创建时间倒序返回。鉴权：**需要登录**。
 

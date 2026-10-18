@@ -19,6 +19,7 @@ services:
     environment:
       # SQLite file lives on the mounted volume so it survives container restarts.
       DATABASE_URL: /app/data/ukiyo-e.sqlite
+      STORAGE_ROOT: /app/data
       # Session JWT signing key (HS256), at least 32 characters. Override it in
       # a local .env for anything beyond a throwaway demo.
       JWT_SECRET: ${JWT_SECRET:-dev-only-secret-please-replace-0123456789abcdef}

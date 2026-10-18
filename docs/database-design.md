@@ -176,7 +176,7 @@ CREATE INDEX idx_images_task ON images (task_id, position);
 
 ### 5.3 设计说明
 
-- **只存相对路径**：`file_path` 相对一个可配置的存储根目录（`STORAGE_ROOT`，第 7 步引入；Docker 下挂卷），迁移目录或重建容器都不会让元数据失效。
+- **只存相对路径**：`file_path` 相对可配置的 `STORAGE_ROOT`（默认 `./data`，Docker 使用 `/app/data`）；迁移目录或重建容器都不会让元数据失效。
 - **元数据 vs 文件**：SQLite 只保存尺寸、类型、大小、哈希等描述信息，像素数据落磁盘。删除时应当「先删 `images` 行（或依赖级联），再由查询层删除对应文件」，两件事在同一业务操作里完成，避免出现孤儿文件。
 - **一对多与 `position`**：一个任务生成多张图时用 `position` 排序供前端按序展示；只生成一张时 `position` 恒为 `0`。
 - **外键方向（为什么 `tasks` 不存图片 ID）**：一对多时外键放在「多」的一侧，即 `images.task_id` 指向 `tasks`，「某任务的图片」通过 `WHERE task_id = ?` 查询得到。反之若把图片 ID 存进 `tasks`（JSON 数组或逗号串），则无法建外键约束、无法用索引反查归属，增删改都别扭；若再加 `cover_image_id` 之类列还会造成两表循环引用。故本设计**不在 `tasks` 上记录图片 ID**；列表页需要缩略图时由查询层用 join 或 `task_id IN (...)` 批量取图。
@@ -287,6 +287,6 @@ CREATE TABLE admin_audit_log (
 2. ✅ 已落地：`apps/api/src/db/queries/users.ts` 提供 **注册 `registerUser`**（固定安全默认）、**创建用户 `createUser`**（管理用途）、**按 email / id 查找 `findUserByEmail` / `findUserById`**、**分页列表 `listUsers`**（含测试）。改 role、调积分、删除用户待补。
 3. ✅ 已落地（§4、§5）：迁移 `apps/api/src/db/migrations/0003_tasks_images.sql` 建 `tasks`、`images` 表与索引；查询模块 `apps/api/src/db/queries/tasks.ts`（创建 / 查找 / 分页 `listTasks` / 删除）与 `images.ts`（创建 / 查找 / 删除），风格对齐 `users.ts`，含 Vitest 测试。
 4. ✅ 已落地（§6）：迁移 `apps/api/src/db/migrations/0004_point_transactions.sql` 建 `point_transactions` 表与索引；查询模块 `apps/api/src/db/queries/point-transactions.ts` 提供 `recordPointTransaction`（原子记账）/ `findPointTransactionById` / `listPointTransactions`，含 Vitest 测试。
-5. 图片落盘与 `STORAGE_ROOT`（第 7 步）在实现存储逻辑时引入。
+5. 图片落盘与 `STORAGE_ROOT` 已在第 7 步实现；Worker 成功后下载图片，SQLite 保存元数据。
 6. 第 8 步接入业务时，用 `recordPointTransaction` 记录 `signup_bonus` / `task_spend` / `task_refund`，并复用其原子事务。
 7. 管理员上线时再加 `requireAdmin` 钩子（§7.1）。<br>✅ 已落地（第 4 步）：`requireAdmin` + `apps/api/src/routes/admin-users.ts` 的创建/检索端点；`listUsers` 增加 `search` 过滤。设计见 [admin-design.md](./admin-design.md)。
