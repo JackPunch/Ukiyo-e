@@ -1,5 +1,9 @@
-import { useMutation } from "@tanstack/react-query";
-import type { CreateImageTaskResponse } from "@ukiyo-e/shared";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type {
+  CreateImageTaskResponse,
+  TaskListResponse,
+  TaskStatusResponse,
+} from "@ukiyo-e/shared";
 import { apiFetch } from "../../api/client";
 
 export interface CreateTaskInput {
@@ -12,12 +16,37 @@ export interface CreateTaskInput {
   };
 }
 
+export function useTaskStatus(taskId: number | null) {
+  return useQuery({
+    queryKey: ["tasks", taskId],
+    queryFn: () => apiFetch<TaskStatusResponse>(`/tasks/${taskId}`),
+    enabled: taskId !== null,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === "succeeded" || status === "failed" ? false : 2_000;
+    },
+  });
+}
+
 export function useCreateTask() {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (input: CreateTaskInput) =>
       apiFetch<CreateImageTaskResponse>("/tasks", {
         method: "POST",
         body: JSON.stringify(input),
       }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["tasks", "history"] });
+    },
+  });
+}
+
+export function useTaskHistory() {
+  return useQuery({
+    queryKey: ["tasks", "history"],
+    queryFn: () => apiFetch<TaskListResponse>("/tasks?limit=20&offset=0"),
+    refetchInterval: 5_000,
   });
 }

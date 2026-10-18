@@ -59,6 +59,10 @@ export interface ListTasksResult {
   total: number;
 }
 
+export interface WorkerTaskRow extends TaskRow {
+  providerTaskId: string;
+}
+
 const COLUMNS = `id, user_id, status, prompt, model, params, points_cost, error,
   attempts, created_at, updated_at, started_at, finished_at`;
 
@@ -101,6 +105,54 @@ export function findTaskById(
   const row = db.prepare(`SELECT ${COLUMNS} FROM tasks WHERE id = ?`).get(id);
 
   return row as unknown as TaskRow | undefined;
+}
+
+/** Returns queued or running tasks that still need provider polling. */
+export function listWorkerTasks(db: DatabaseSync): WorkerTaskRow[] {
+  const rows = db
+    .prepare(
+      `SELECT ${COLUMNS} FROM tasks
+       WHERE status IN ('queued', 'running')
+       ORDER BY id ASC`,
+    )
+    .all() as unknown as TaskRow[];
+
+  return rows.flatMap((task) => {
+    const params = parseTaskParams(task);
+    const providerTaskId = params?.providerTaskId;
+    return typeof providerTaskId === "string"
+      ? [{ ...task, providerTaskId }]
+      : [];
+  });
+}
+
+/** Updates a task lifecycle state and its worker metadata. */
+export function updateTaskStatus(
+  db: DatabaseSync,
+  id: number,
+  status: TaskStatus,
+  options: { error?: string | null; started?: boolean } = {},
+): void {
+  const now = new Date().toISOString();
+  db.prepare(
+    `UPDATE tasks
+     SET status = ?,
+         error = ?,
+         attempts = attempts + 1,
+         updated_at = ?,
+         started_at = CASE WHEN ? = 1 AND started_at IS NULL THEN ? ELSE started_at END,
+         finished_at = CASE WHEN ? IN ('succeeded', 'failed') THEN ? ELSE finished_at END
+     WHERE id = ?`,
+  ).run(
+    status,
+    options.error ?? null,
+    now,
+    options.started ? 1 : 0,
+    now,
+    status,
+    now,
+    id,
+  );
 }
 
 /**

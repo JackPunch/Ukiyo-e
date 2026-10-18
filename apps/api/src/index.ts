@@ -1,4 +1,5 @@
 import { buildServer } from "./server";
+import { runTaskWorkerOnce } from "./worker";
 
 const port = Number(process.env.PORT ?? 3000);
 const host = process.env.HOST ?? "0.0.0.0";
@@ -11,6 +12,11 @@ try {
   app.log.error(error);
   process.exit(1);
 }
+
+const workerTimer = setInterval(() => {
+  void runTaskWorkerOnce(app.db, app.log);
+}, 5_000);
+workerTimer.unref();
 
 // Fastify does not listen to OS signals itself, so wire SIGINT/SIGTERM to
 // app.close(): that drains the server and runs the onClose hooks (e.g. closing

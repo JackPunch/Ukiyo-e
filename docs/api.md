@@ -401,7 +401,8 @@ set-cookie: ukiyo_session=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00
 ### 4.9 `POST /api/tasks`
 
 创建一个 Nano Banana 2.1 图片生成任务。鉴权：**需要登录**。
-服务端会同步调用 Kie.ai 的创建任务接口；此步骤只负责提交任务，不查询进度或下载图片。
+服务端会同步调用 Kie.ai 的创建任务接口；后台 Worker 随后轮询供应商并更新本地状态，
+本步骤不下载或展示最终图片。
 
 请求体字段与 [Mock provider task API](#48-mock-provider-task-api) 相同：
 
@@ -438,6 +439,68 @@ set-cookie: ukiyo_session=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00
 | `401` | `unauthorized` | 未登录 |
 | `500` | `internal_error` | 服务端未配置 `KIE_API_KEY` |
 | `502` | `internal_error` | 供应商超时、不可用、响应无效或拒绝任务 |
+
+### 4.10 `GET /api/tasks/:taskId`
+
+查询当前登录用户拥有的任务状态。鉴权：**需要登录**。后台 Worker 会把供应商状态映射为
+`queued`（排队中）、`running`（生成中）、`succeeded`（成功）或 `failed`（失败）。
+
+`200 OK`
+
+```json
+{
+  "taskId": 1,
+  "status": "running",
+  "prompt": "A simple ukiyo-e style blue wave",
+  "model": "nano-banana-2-1",
+  "error": null,
+  "createdAt": "2026-10-18T07:00:00.000Z",
+  "updatedAt": "2026-10-18T07:00:02.000Z",
+  "startedAt": "2026-10-18T07:00:01.000Z",
+  "finishedAt": null
+}
+```
+
+| 状态码 | `code` | 场景 |
+| --- | --- | --- |
+| `200` | — | 返回任务状态 |
+| `400` | `validation_error` | `taskId` 不是正整数 |
+| `401` | `unauthorized` | 未登录 |
+| `404` | `not_found` | 任务不存在或不属于当前用户 |
+
+### 4.11 `GET /api/tasks`
+
+查询当前登录用户的历史任务，按创建时间倒序返回。鉴权：**需要登录**。
+
+查询参数 `limit` 默认为 `20`，范围为 `1–100`；`offset` 默认为 `0`，不能为负数。
+
+`200 OK`
+
+```json
+{
+  "items": [
+    {
+      "taskId": 1,
+      "status": "succeeded",
+      "prompt": "A simple ukiyo-e style blue wave",
+      "model": "nano-banana-2-1",
+      "error": null,
+      "createdAt": "2026-10-18T07:00:00.000Z",
+      "updatedAt": "2026-10-18T07:00:20.000Z",
+      "finishedAt": "2026-10-18T07:00:20.000Z"
+    }
+  ],
+  "total": 1,
+  "limit": 20,
+  "offset": 0
+}
+```
+
+| 状态码 | `code` | 场景 |
+| --- | --- | --- |
+| `200` | — | 返回当前用户的任务历史 |
+| `400` | `validation_error` | 分页参数不合法 |
+| `401` | `unauthorized` | 未登录 |
 
 ### 5.2 枚举
 

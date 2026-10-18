@@ -3,15 +3,52 @@ import {
   errorBody,
   mockCreateTaskRequestSchema,
   providerCreateTaskResponseSchema,
+  taskListQuerySchema,
+  taskListResponseSchema,
+  taskStatusResponseSchema,
 } from "@ukiyo-e/shared";
 import type { FastifyInstance } from "fastify";
-import { createTask } from "../db/queries/tasks";
+import { createTask, findTaskById, listTasks } from "../db/queries/tasks";
 import { sendValidationError } from "./helpers";
 
 const KIE_CREATE_TASK_URL = "https://api.kie.ai/api/v1/jobs/createTask";
 const KIE_TIMEOUT_MS = 30_000;
 
 export async function taskRoutes(app: FastifyInstance): Promise<void> {
+  app.get(
+    "/tasks",
+    { preHandler: app.requireAuth },
+    async (request, reply) => {
+      const parsed = taskListQuerySchema.safeParse(request.query);
+      if (!parsed.success) return sendValidationError(reply, parsed.error);
+
+      const { limit, offset } = parsed.data;
+      const result = listTasks(app.db, {
+        userId: request.user!.id,
+        limit,
+        offset,
+      });
+
+      return reply.send(
+        taskListResponseSchema.parse({
+          items: result.items.map((task) => ({
+            taskId: task.id,
+            status: task.status === "canceled" ? "failed" : task.status,
+            prompt: task.prompt,
+            model: task.model,
+            error: task.error,
+            createdAt: task.created_at,
+            updatedAt: task.updated_at,
+            finishedAt: task.finished_at,
+          })),
+          total: result.total,
+          limit,
+          offset,
+        }),
+      );
+    },
+  );
+
   app.post(
     "/tasks",
     { preHandler: app.requireAuth },
@@ -85,6 +122,38 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
           taskId: task.id,
           providerTaskId,
           status: task.status,
+        }),
+      );
+    },
+  );
+
+  app.get(
+    "/tasks/:taskId",
+    { preHandler: app.requireAuth },
+    async (request, reply) => {
+      const taskId = Number((request.params as { taskId: string }).taskId);
+      if (!Number.isSafeInteger(taskId) || taskId <= 0) {
+        return reply
+          .status(400)
+          .send(errorBody("validation_error", "任务 ID 不合法"));
+      }
+
+      const task = findTaskById(app.db, taskId);
+      if (!task || task.user_id !== request.user!.id) {
+        return reply.status(404).send(errorBody("not_found", "任务不存在"));
+      }
+
+      return reply.send(
+        taskStatusResponseSchema.parse({
+          taskId: task.id,
+          status: task.status === "canceled" ? "failed" : task.status,
+          prompt: task.prompt,
+          model: task.model,
+          error: task.error,
+          createdAt: task.created_at,
+          updatedAt: task.updated_at,
+          startedAt: task.started_at,
+          finishedAt: task.finished_at,
         }),
       );
     },

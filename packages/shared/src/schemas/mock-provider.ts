@@ -37,6 +37,26 @@ export type CreateImageTaskResponse = z.infer<
   typeof createImageTaskResponseSchema
 >;
 
+export const taskStatusSchema = z.enum([
+  "queued",
+  "running",
+  "succeeded",
+  "failed",
+]);
+
+export const taskStatusResponseSchema = z.object({
+  taskId: z.number().int().positive(),
+  status: taskStatusSchema,
+  prompt: z.string(),
+  model: z.string().nullable(),
+  error: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  startedAt: z.string().nullable(),
+  finishedAt: z.string().nullable(),
+});
+export type TaskStatusResponse = z.infer<typeof taskStatusResponseSchema>;
+
 export const mockTaskDetailResponseSchema = z.object({
   code: z.number(),
   msg: z.string(),
@@ -51,12 +71,12 @@ export const mockTaskDetailResponseSchema = z.object({
         .object({ resultUrls: z.array(z.url()) })
         .nullable()
         .optional(),
-      failCode: z.string().nullable(),
-      failMsg: z.string().nullable(),
-      costTime: z.number(),
-      completeTime: z.number().nullable(),
-      createTime: z.number(),
-      creditsConsumed: z.number(),
+      failCode: z.string().nullable().optional(),
+      failMsg: z.string().nullable().optional(),
+      costTime: z.number().optional(),
+      completeTime: z.number().nullable().optional(),
+      createTime: z.number().optional(),
+      creditsConsumed: z.number().optional(),
     })
     .nullable(),
 });
